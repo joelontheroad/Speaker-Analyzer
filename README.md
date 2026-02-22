@@ -1,9 +1,3 @@
-# Public Meeting Speaker Analyzer
-
-# Version: 0.1.0 
-# SPDX-License-Identifier: AGPL-3.0-only
-# Copyright (C) 2026 Joel Greenberg
-
 ## Overview
 Welcome to the Public Meeting Speaker Analyzer utility. A configurable, private, AI-powered tool for transcribing the video of public meetings; summarizing what people said; and reporting on sentiment. It's private in that it's designed to run on a local machine with a GPU, whether that's your desktop, a laptop, or a server on your local network. Journalists, researchers, and others in civil society will find this tool useful. 
 
@@ -15,7 +9,7 @@ Inspired by security and privacy principals in mind, you can mask the names of s
 
 ## Features
 -   **Links to Video**: All reports include links to the exact place where someone said something cited in a report so you can quickly jump to it and hear exactly what a person said. 
--   **Modular Architecture**: Includes connectors for City of Austin (Swagit), City of Houston (Swagit), and YouTube. Other connectors to different video sources can be created by anyone so you can perform analysis on any public meeting database that doesn't restrict downloads.
+-   **Modular Architecture**: Includes connectors for City of Austin, City of Houston, and YouTube. Other connectors to different video sources can be created by anyone so you can perform analysis on any public meeting database that doesn't restrict downloads.
 -   **Privacy Feature**: Optional masking of speaker names (--mask cli flag) so that you can share reports while maintaining the privacy of the speakers. 
 -   **Local AI Analysis**: Connects to any local LLM provider that use adheres to the openAI API specification (e.g., LM Studio) for all AI anlaysis. Use whatever AI model runs on your GPU. All your data stays in your network; you're not sharing any information with a SaaS service.
 -   **Flexible CLI**: Run phases (Download, Transcribe, Report) individually or all at once. Download the media once, report again and again even with different prompts to extract the most knowledge you can.
@@ -59,7 +53,7 @@ WhisperX uses **Pyannote** for speaker diarization (identifying who is speaking)
     *   Name it (e.g., "Speaker-Analyzer") and set the type to **Read**.
     *   Copy the token; you'll need it for your configuration.
 
-#### Does it "phone home" every time?
+#### Does it contact Hugghing Face every run?
 Yes. Because these models are gated, the program needs to provide your token to Hugging Face at the start of every transcription phase (Phase 2) to verify you still have permission to use the model. While the heavy model files (several GBs) are cached locally after the first run, the program performs a brief "handshake" with Hugging Face for each video processed.
 
 ### 2. Installation
@@ -178,7 +172,7 @@ python speaker-analyzer.py --report --between 4-8
 This repository includes several standalone utility programs that extend the analysis capabilities of the main pipeline:
 
 ### 1. `argument-analyzer.py`
-This program reads through all fully-transcribed meetings and uses the LLM to extract every raw claim made by the speakers. It then semantically clusters these identical or highly similar claims into organized "canonical" arguments, showing exactly how many people argued for the same point regardless of how they phrased it.
+The main program.  This program reads through all fully-transcribed meetings and uses the LLM to extract every raw claim made by the speakers. It then semantically clusters these identical or highly similar claims into organized "canonical" arguments, showing exactly how many people argued for the same point regardless of how they phrased it.
 
 **CLI Options:**
 -   `--mask`: Mask speaker names in LLM prompts to ensure their identities remain private during extraction and analysis.
@@ -200,6 +194,18 @@ This program allows you to ask natural language questions against the entire rec
 -   `--mask`: Mask speaker names in the context provided to the LLM and in all generated source citations for privacy.
 -   `--sentiment CLASS`: Pre-filter the database search to only include speakers with a specific sentiment class (e.g., `--sentiment "Pro-Israel"`). Highly recommended for side-specific queries to eliminate cross-contamination from the other side.
 
+### 4. `check-urls.py`
+A validation utility used to "dry-run" your input URLs before starting a long transcription process. It verifies that URLs are accessible, confirms that a compatible connector is available, and ensures that metadata (like titles and media streams) can be successfully extracted.
+
+**CLI Options:**
+-   `--url URL`: Validate a single URL.
+-   `--batch FILE`: Validate a list of URLs from a text file (one per line).
+-   `--connector SLUG`: Manually specify which connector should handle the URL (e.g., `Austin`, `Houston`, `YouTube`).
+-   `--verbose`: Show detailed error messages for any failures.
+
+**Usage:** Helps prevent wasted time by identifying broken links or unsupported sources before you run the main `speaker-analyzer.py` pipeline.
+
+
 ## Directory Structure
 -   `workspaces/`: Root directory for all workspace-specific data.
     -   `{Slug}/`: Individual workspace (e.g., `Austin`, `YouTube`).
@@ -212,4 +218,5 @@ This program allows you to ask natural language questions against the entire rec
 -   `logs/`: Application logs.
 
 ### The Program's Approach to Privacy and Security ###
-This program was designed as a "Private AI". It assumes files are downloaded from the public internet to a private network behind an industry standard firewall and that all analysis are done on GPU's located in the network behind that firewall. The intent is that all files stay within this private network. The program does not communicate with the Internt except when downloading files.  In this way, all analysis and reporting is private.  The program doesn not enforce this requirement, so it's assumed that the user will use it that way. By using an encrypted hard drive for the media files, you may actually be able to pass security certification, but there's no guarantee. If this an issue, consult a compliance professional.
+This program was designed as a "Private AI". It assumes media files are downloaded from the public internet to a private network behind an industry standard firewall and that all analysis are done on GPU's located in the network behind that firewall. The intent is that all files stay within this private network. The program does not communicate with the Internt except when downloading files.  In this way, all analysis and reporting is private.  The program doesn not enforce this requirement, so it's assumed that the user will use it that way. By using an encrypted hard drive for the media files, you may actually be able to pass security certification, but there's no guarantee. If this an issue, consult a compliance professional. This program connects to the Internt to: 1) download media files, and 2) get validation from Hugging Face to use their models at run time.  That's it. Future versions will eliminate the need for getting validation every time from Hugging Face.  If you already have have a media database, you can point to it via defaults.yaml and not have to go out to the Internet.
+
