@@ -1,0 +1,46 @@
+# --- Local Data (From your defaults.yaml) ---
+# We exclude the actual content to keep the repo light
+/media-vault/
+/reports/
+/transcripts/
+/final-reports/
+/summaries/
+
+# --- Configuration ---
+# Exclude your specific local setup
+configs/defaults.yaml
+configs/prompts.yaml
+# But we will NOT exclude configs/defaults.yaml.example
+
+# --- Python Environment ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.venv/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+
+# --- Dev files & directories to ignore ---
+2-17-26-1-50pm-backup.tar.gz
+2-19-26-2am-backup.tar.gz
+2-19-26-6-45pm-backup.tar.gz
+2-20-26-11am-backup.tar.gz
+questions-to-ask.txt
+run-all.sh
+run-some.sh
+tmp_processing/
+transcribe-all.txt
+transcribe-final.txt
+transcribe-these-videos.txt
+voice_biometrics_research.md
+
+# --- Local Workspaces ---
+/workspaces/
+/media/
+/logs/
+/db/

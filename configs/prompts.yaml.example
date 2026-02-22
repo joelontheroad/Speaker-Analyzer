@@ -1,0 +1,68 @@
+# **********************************************************
+# Public Meeting Speaker Analyzer
+# file: configs/prompts.yaml
+# Version: 0.1.0
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Joel Greenberg
+# **********************************************************
+
+# -----------------------------------------------------------------------------
+# ANALYSIS INSTRUCTIONS
+# -----------------------------------------------------------------------------
+# This is the primary system prompt that tells the LLM what its role is and 
+# how it should analyze the text. 
+analysis_instructions: "Topic: Property Taxes and local fiscal policy. You are a local government policy researcher reporting on public comments during city council meetings regarding property tax rates, homestead exemptions, and municipal budget allocation. Your goal is to identify citizens speaking about their tax burden or the city's tax policy and determine if they are advocating for lower taxes or prioritizing city services. Keywords: {keywords}"
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CATEGORIES
+# -----------------------------------------------------------------------------
+# Define the labels you want the AI to use for sentiment classification.
+sentiment_categories:
+  - "Support Tax Relief"
+  - "Prioritize City Services"
+  - "Neutral/Procedural"
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CLASSIFICATION RULES
+# -----------------------------------------------------------------------------
+# Detailed criteria for each sentiment category.
+sentiment_instructions: |
+  CRITICAL CLASSIFICATION RULES:
+  - **Support Tax Relief**: Speaker advocates for lower tax rates, higher homestead exemptions, or budget cuts. Use this for phrases like "taxed out of my home," "fixed income," "stop the spending," "no-new-revenue rate," or complaints about high appraisals and rising tax bills.
+  - **Prioritize City Services**: Speaker emphasizes the need to fund city departments (e.g., libraries, parks, police, EMS) even if it requires maintaining tax revenue. Use this for phrases like "fair share," "invest in our community," "don't cut services," or "tax revenue is necessary for growth."
+  - **Neutral/Procedural**: Only if the speaker is discussing the appraisal protest process, tax calendar, or asking factual questions without taking a position on the rate itself.
+
+  RHETORICAL INFERENCE:
+  Carefully analyze the tone. If a speaker uses sarcasm (e.g., "I guess the city just doesn't have enough of my money yet"), classify according to their true intent (Tax Relief) rather than the literal meaning of the words.
+
+  DO NOT default to Neutral if any clear position is stated. If the speaker expresses ANY desire for lower taxes or concern about affordability, classify as "Support Tax Relief".
+
+# -----------------------------------------------------------------------------
+# KEYWORDS (TOPIC EXPANSION)
+# -----------------------------------------------------------------------------
+# A list of words/phrases that help the LLM identify relevant discussion.
+keywords:
+    - "Property tax"
+    - "Tax rate"
+    - "Appraisal"
+    - "Assessment"
+    - "Homestead exemption"
+    - "Tax bill"
+    - "Fixed income"
+    - "Affordability"
+    - "No-new-revenue"
+    - "Voter-approval rate"
+    - "Budget"
+    - "M&O"
+    - "I&S"
+    - "Debt service"
+    - "Revenue"
+    - "Local government code"
+    - "Exemption"
+    - "Tax burden"
+    - "Overspending"
+    - "Fiscal responsibility"
+    - "City services"
+    - "Public safety"
+    - "Infrastructure"

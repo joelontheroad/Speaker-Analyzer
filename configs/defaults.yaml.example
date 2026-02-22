@@ -1,0 +1,93 @@
+# **********************************************************
+# Public Meeting Speaker Analyzer
+# file: configs/defaults.yaml
+# Version: 0.1.0
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Joel Greenberg
+# **********************************************************
+
+# ----------------------------------------------------------
+# PATH CONFIGURATION
+# ----------------------------------------------------------
+paths:
+  # Location of the connector modules
+  connectors: ./connectors
+  
+  # Directory where system and analysis logs are stored
+  logs: ./logs
+  
+  # The root directory for all meeting data (media, transcripts, reports)
+  workspace_root: ./workspaces
+
+# ----------------------------------------------------------
+# CONNECTOR SETTINGS
+# ----------------------------------------------------------
+# The default city/source to use if none is specified via --connector
+default_connector: Austin
+
+# ----------------------------------------------------------
+# NETWORK & API CONFIGURATION
+# ----------------------------------------------------------
+network:
+  # URL for the local LLM server (e.g., LM Studio or Ollama)
+  llm_api_url: http://127.0.0.1:1234
+  
+  # Hugging Face token for accessing gated models (like pyannote diarization)
+  hf_token: YOUR_HUGGING_FACE_TOKEN_HERE
+  
+  # Maximum time (in seconds) allowed for a single media download
+  max_download_duration: 2700
+
+# ----------------------------------------------------------
+# AI & ANALYSIS SETTINGS
+# ----------------------------------------------------------
+ai_settings:
+  analysis:
+    # Default video duration if it cannot be determined automatically
+    default_duration: 2700
+  
+  diarization:
+    # The pyannote model used for speaker identification
+    model: pyannote/speaker-diarization-3.1
+  
+  llm:
+    # Maximum context tokens for the LLM
+    context_window: 16000
+    
+    # Input character limits for various LLM tasks
+    max_input_tokens:
+      identity: 10000
+      relevance: 12000
+      sentiment: 12000
+      summary: 12000
+      
+    # Output token limits for various LLM tasks
+    max_output_tokens:
+      identity: 100
+      relevance: 10
+      sentiment: 10
+      summary: 250
+      
+    # LLM variety/randomness (0.0 is deterministic, higher is more creative)
+    temperature:
+      analysis: 0.1
+      creative: 0.3
+      extraction: 0.1
+  
+  rag:
+    # Buffer size for document chunking
+    chunk_size: 500
+    # Directory for the vector database
+    database_dir: ./db
+    # Model used for generating text embeddings
+    embedding_model: nomic-embed-text-v1.5
+  
+  transcription:
+    # Number of segments to process in parallel
+    batch_size: 8
+    # WhisperX model size (tiny, base, small, medium, large-v3)
+    model: small
+    # Voice Activity Detection settings
+    vad: true
+    vad_threshold: 0.35
