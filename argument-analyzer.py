@@ -31,6 +31,8 @@ class ArgumentAnalyzer:
         self.log = logger
         self.fm = file_manager
         self.mask = mask
+        self.log.info(f"Connector Slug: {self.fm.connector_slug}")
+        self.log.info(f"Transcripts Path Resolved: {self.fm.resolve_path('transcripts')}")
         # Load prompts directly from config via FileManager (standardized in earlier turns)
         # But for standalone, we reload them
         try:
@@ -239,7 +241,8 @@ DO NOT return markdown. Only return valid JSON."""
 
         files = [f for f in os.listdir(trans_dir) if f.endswith('_transcript.json')]
         if not files:
-            self.log.error("No transcripts found.")
+            self.log.error(f"No transcripts found in: {trans_dir}")
+            self.log.info(f"Directory total file count: {len(os.listdir(trans_dir))}")
             return
             
         categories = self.prompts.get('sentiment_categories', ['Neutral'])
@@ -404,23 +407,148 @@ DO NOT return markdown. Only return valid JSON."""
 
         out_file_html = out_file_md.replace('.md', '.html')
         with open(out_file_html, 'w') as f:
-            style = "body { font-family: Arial, sans-serif; margin: 20px; } table { border-collapse: collapse; width: 100%; margin-bottom: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } tr:nth-child(even) { background-color: #f9f9f9; }"
-            categories = self.prompts.get('sentiment_categories', ['Neutral'])
-            colors = ['#ffe0e0', '#e0e0ff', '#e0ffe0', '#ffffe0', '#fff0e0', '#f0e0ff', '#f0f0f0']
-            for i, cat in enumerate(categories):
-                cls_name = cat.lower().replace(' ', '-'); color = colors[i % len(colors)] if cat.lower() != 'neutral' else '#f0f0f0'
-                style += f" .sentiment-{cls_name} {{ background-color: {color}; }}"
+            # Modern, High-End shared CSS
+            style = """
+            :root {
+                --primary: #0f172a;
+                --secondary: #334155;
+                --accent-blue: #2563eb;
+                --accent-red: #dc2626;
+                --bg: #f8fafc;
+                --card-bg: #ffffff;
+                --text-main: #1e293b;
+                --text-muted: #64748b;
+                --border: #e2e8f0;
+            }
+            body { 
+                font-family: 'Inter', -apple-system, sans-serif; 
+                background: var(--bg); 
+                color: var(--text-main);
+                margin: 0; padding: 0; 
+                line-height: 1.6;
+            }
+            .header {
+                background: var(--primary);
+                color: white;
+                padding: 3rem 2rem;
+                text-align: center;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            }
+            .header h1 { margin: 0; font-size: 2.5rem; letter-spacing: -0.025em; }
+            .header .meta { 
+                margin-top: 1rem; 
+                font-family: monospace; 
+                color: #94a3b8; 
+                text-transform: uppercase; 
+                letter-spacing: 0.1em; 
+            }
+            .container { max-width: 1100px; margin: -2rem auto 4rem; padding: 0 1rem; }
+            .dashboard {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+            .stat-card {
+                background: var(--card-bg);
+                padding: 1.5rem;
+                border-radius: 0.75rem;
+                box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                text-align: center;
+                border: 1px solid var(--border);
+            }
+            .stat-card .label { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem; }
+            .stat-card .value { font-size: 2rem; font-weight: 800; color: var(--primary); }
             
-            f.write(f"<html><head><title>Semantic Argument Analysis - {source_name}</title><style>{style}</style></head><body>")
-            f.write(f"<h1>Semantic Argument Analysis - {source_name}</h1>")
-            f.write(f"<p><strong>Report Generated:</strong> {datetime.datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>")
-            if date_range: f.write(f"<p><strong>Time Period:</strong> {date_range}</p>")
-            f.write("<table><thead><tr><th>Argument Made</th><th>Count</th><th>Sentiment</th><th>Links</th></tr></thead><tbody>")
+            .content-section {
+                background: var(--card-bg);
+                padding: 2.5rem;
+                border-radius: 1rem;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                margin-bottom: 2rem;
+                border: 1px solid var(--border);
+            }
+            
+            table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+            th { text-align: left; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; padding: 1rem; border-bottom: 2px solid var(--border); }
+            td { padding: 1rem; border-bottom: 1px solid var(--border); }
+            
+            .pill {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+            .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
+            .pill-pro-israel { background: #fee2e2; color: #991b1b; }
+            .pill-neutral { background: #f1f5f9; color: #475569; }
+            
+            .watch-btn {
+                background: var(--primary);
+                color: white;
+                text-decoration: none;
+                padding: 0.4rem 0.8rem;
+                border-radius: 0.375rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                transition: background 0.2s;
+                display: inline-block;
+                margin-right: 0.5rem;
+                margin-bottom: 0.3rem;
+            }
+            .watch-btn:hover { background: var(--accent-blue); }
+            """
+            
+            f.write(f"<!DOCTYPE html><html><head><title>Semantic Argument Analysis - {source_name}</title><style>{style}</style></head><body>")
+            
+            # Header
+            f.write(f"<div class='header'>")
+            f.write(f"<div class='meta'>SEMANTIC ARGUMENT CLUSTERING // GENESIS ANALYSIS</div>")
+            f.write(f"<h1>{source_name}: Argument Landscape</h1>")
+            f.write(f"<p style='opacity: 0.7; margin-top: 0.5rem;'>{date_range}</p>")
+            f.write(f"</div>")
+            
+            f.write("<div class='container'>")
+            
+            # Dashboard
+            total_args = len(results)
+            top_sentiment = "N/A"
+            if results:
+                from collections import Counter
+                top_sentiment = Counter([r['sentiment'] for r in results]).most_common(1)[0][0]
+
+            f.write("<div class='dashboard'>")
+            f.write(f"<div class='stat-card'><div class='label'>Total Arguments</div><div class='value'>{total_args}</div></div>")
+            f.write(f"<div class='stat-card'><div class='label'>Primary Discourse</div><div class='value'>{top_sentiment}</div></div>")
+            f.write(f"<div class='stat-card'><div class='label'>Report Date</div><div class='value' style='font-size: 1.2rem; padding-top: 0.8rem;'>{datetime.datetime.now().strftime('%b %d, %Y')}</div></div>")
+            f.write("</div>")
+            
+            f.write("<div class='content-section'>")
+            f.write("<h2>Canonical Argument Clusters</h2>")
+            f.write("<p style='color: var(--text-muted); margin-bottom: 1.5rem;'>The following table represents high-level semantic arguments grouped from individual speaker testimonies. Counts reflect the number of unique participants who made these points.</p>")
+            
+            f.write("<table><thead><tr><th>Core Argument Claim</th><th>Participant Count</th><th>Sentiment</th><th>Evidence Links</th></tr></thead><tbody>")
             for res in results:
-                s_cls = f"sentiment-{res['sentiment'].lower().replace(' ', '-')}"
-                links = res.get('links', []); html_links = ' '.join([f"<a href='{url}' target='_blank'>{l}</a>" for l, url in links]) if links else '—'
-                f.write(f"<tr><td>{res['argument']}</td><td>{res['count']}</td><td class='{s_cls}'>{res['sentiment']}</td><td>{html_links}</td></tr>")
-            f.write("</tbody></table><hr><p>&copy; Copyright 2026. Joel Greenberg. All Rights Reserved. Contact the author at joelontheroad@proton.me</p></body></html>")
+                cat_pill = f"pill pill-{res['sentiment'].lower().replace(' ', '-')}"
+                links = res.get('links', [])
+                html_links = ''.join([f"<a href='{url}' target='_blank' class='watch-btn'>Watch Clip</a>" for l, url in links[:5]]) if links else '—'
+                if len(links) > 5: html_links += f"<br><small style='color: var(--text-muted)'>+{len(links)-5} more links</small>"
+                
+                f.write(f"<tr>")
+                f.write(f"<td><strong>{res['argument']}</strong></td>")
+                f.write(f"<td>{res['count']} speakers</td>")
+                f.write(f"<td><span class='{cat_pill}'>{res['sentiment']}</span></td>")
+                f.write(f"<td>{html_links}</td>")
+                f.write(f"</tr>")
+            f.write("</tbody></table>")
+            f.write("</div>")
+            
+            f.write("<div style='text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 2rem;'>")
+            f.write("&copy; Copyright 2026. Joel Greenberg. All Rights Reserved. Contact the author at joelontheroad@proton.me")
+            f.write("</div>")
+            f.write("</div></body></html>")
             
         self.log.success(f"HTML Report generated: {out_file_html}")
 

@@ -20,6 +20,16 @@ class Analyzer:
         # Spinner infrastructure
         self.spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         self.spinner_idx = 0
+        
+        # Define organization categories for the Executive Briefing
+        self.org_categories = [
+            "Advocacy & Human Rights Groups",
+            "Religious & Faith Institutions",
+            "Academic & Student Organizations",
+            "Political & Policy Organizations",
+            "Professional & Labor Associations",
+            "Unaffiliated / Private Citizens"
+        ]
 
     def _load_prompts(self):
         try:
@@ -612,6 +622,45 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
             self.log.error(f"Summary LLM Exception: {e}")
             return text[:200] + "..."  # Fallback to truncated text
 
+    def _is_none_affiliation(self, a):
+        if not a: return True
+        a_lower = a.lower().strip()
+        
+        # Exact matches or starts with
+        if a_lower == 'none' or a_lower.startswith('none ('): return True
+        if a_lower == 'no affiliation stated': return True
+        
+        # Keyword matches
+        keywords = [
+            'no affiliation',
+            'no organization',
+            'no formal organization',
+            'no specific organization',
+            '(individual)',
+            '(private citizen)',
+            '(individual citizen)',
+            '(self-identified)'
+        ]
+        if any(kw in a_lower for kw in keywords): return True
+        
+        # Specific edge cases from LLM output
+        if "speaker's name is mentioned, but no organizational affiliation is provided" in a_lower: return True
+        if "speaker's personal affiliation not mentioned" in a_lower: return True
+        if "affiliation is not explicitly mentioned" in a_lower: return True
+        
+        # Individual professions without organization
+        if a_lower == 'author': return True
+        if a_lower == 'austin small business owner': return True
+        if a_lower == 'healthcare worker (specifically in mental health)': return True
+        if a_lower == 'licensed professional counselor, palestinian american muslim woman': return True
+        if a_lower == 'palestinian christian born and raised in bethlehem': return True
+        if a_lower.startswith('resident of district'): return True
+        if a_lower == 'district 3 (presumably a local government district)': return True
+        if a_lower == 'israeli (note: the speaker mentions being "israeli" but does not provide a specific organization affiliation)': return True
+        if a_lower == 'jewish community': return True
+        
+        return False
+
     def _format_timestamp(self, seconds):
         """Convert seconds to HH:MM:SS format"""
         hours = int(seconds // 3600)
@@ -622,13 +671,74 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
         else:
             return f"{minutes}:{secs:02d}"
 
-            return f"{minutes}:{secs:02d}"
+    def _categorize_affiliations(self, unique_affiliations):
+        """Use LLM to categorize a list of unique affiliations into predefined buckets."""
+        if not unique_affiliations:
+            return {}
+            
+        # Filter out 'NONE' or similar obvious individuals
+        real_orgs = [a for a in unique_affiliations if not self._is_none_affiliation(a)]
+        if not real_orgs:
+            return {a: "Unaffiliated / Private Citizens" for a in unique_affiliations}
 
-    def generate_report(self, all_results, report_dir, grand_total_speakers=0, all_meeting_dates=None, all_meetings_metadata=None, mask=False, source_name="City Council", source_slug="CityCouncil"):
-        if not all_results: return
+        system_prompt = f"""Categorize the following organizations/affiliations into these EXACT categories:
+{chr(10).join(self.org_categories)}
+
+Return a JSON object where the keys are the organization names and the values are the categories.
+If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Private Citizens'."""
+
+        user_prompt = f"Organizations to categorize:\n{chr(10).join(real_orgs)}"
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.1,
+            "response_format": { "type": "json_object" }
+        }
+        
+        mapping = {}
+        try:
+            self._spinner_update("Categorizing organizations for executive briefing...")
+            url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
+            resp = requests.post(url, json=payload, timeout=30)
+            if resp.status_code == 200:
+                content = resp.json()['choices'][0]['message']['content'].strip()
+                mapping = json.loads(content)
+        except Exception as e:
+            self.log.error(f"Affiliation categorization failed: {e}")
+            
+        # Fill in defaults if LLM missed any or for individuals
+        final_mapping = {}
+        for a in unique_affiliations:
+            if a in mapping:
+                final_mapping[a] = mapping[a]
+            elif self._is_none_affiliation(a):
+                final_mapping[a] = "Unaffiliated / Private Citizens"
+            else:
+                final_mapping[a] = "Other / Uncategorized"
+        
+        return final_mapping
+
+    def _select_representative_voices(self, results, sentiment_categories, count_per_cat=3):
+        """Select the best examples of statements for each sentiment category."""
+        representative = {cat: [] for cat in sentiment_categories}
+        
+        for cat in sentiment_categories:
+            cat_results = [r for r in results if r['sentiment'] == cat and not r.get('metadata_only')]
+            # Sort by summary length and clarity (heuristic: longer summaries often more descriptive)
+            cat_results.sort(key=lambda x: len(x['example']), reverse=True)
+            
+            # Pick top N
+            representative[cat] = cat_results[:count_per_cat]
+            
+        return representative
+    def generate_report(self, all_results, report_dir, grand_total_speakers=0, all_meeting_dates=None, all_meetings_metadata=None, mask=False, source_name="City Council", source_slug="CityCouncil", is_individual=False):
         
         # Use the source_name in the title
         title_prefix = f"Speaker Analysis Report - {source_name}"
+        briefing_title = f"Executive Briefing: {source_name} {all_results[0].get('meeting', '').split('(')[0].strip() if all_results else ''}"
         
         # Sort results by date (chronologically - earliest first)
         from datetime import datetime
@@ -650,21 +760,24 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
         
         all_results.sort(key=lambda r: parse_date(r['date']))
         
-        
         # Filter out metadata_only results for statistics and tables
-        # Use explicit comparison to True to avoid any truthiness issues
         filtered_results = [r for r in all_results if r.get('metadata_only') is not True]
         
         sentiments = [r['sentiment'] for r in filtered_results]
         total_on_topic = len(sentiments)
         
-        # Use the grand total passed in, or default to on-topic count if 0 (shouldn't happen if properly passed)
+        # Use the grand total passed in, or default to on-topic count if 0
         total_all_topics = grand_total_speakers if grand_total_speakers > 0 else total_on_topic
+        pct_on_topic_val = (total_on_topic / total_all_topics * 100) if total_all_topics > 0 else 0
         
         # Calculate sentiment counts and percentages
-        counts = {s: sentiments.count(s) for s in set(sentiments)}
+        categories = self.prompts.get('sentiment_categories', ['Neutral'])
+        all_sentiment_keys = categories + sorted(list(set(sentiments) - set(categories)))
+        counts = {s: sentiments.count(s) for s in all_sentiment_keys}
+        
         stats = []
-        for s, count in counts.items():
+        for s in all_sentiment_keys:
+            count = counts.get(s, 0)
             pct_on_topic = (count / total_on_topic) * 100 if total_on_topic > 0 else 0
             pct_all = (count / total_all_topics) * 100 if total_all_topics > 0 else 0
             stats.append({
@@ -675,13 +788,10 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
             })
             
         # Header Info
-        # Extract Topic from Prompt
         prompt_text = self.prompts.get('analysis_instructions', '')
-        # Regex to find "Topic: <...>"
         topic_match = re.search(r'Topic:\s*(.*?)(?:\.|$)', prompt_text)
         topic = topic_match.group(1) if topic_match else "Unknown Topic"
         
-        # Use provided meeting dates if available (for full range even if some meetings had 0 results)
         if all_meeting_dates:
             dates = [d for d in all_meeting_dates if d != 'Unknown Date']
         else:
@@ -697,19 +807,33 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
              d_end = parse_date(dates_sorted[-1])
              start_date_str = d_start.strftime('%Y-%m-%d') if d_start != datetime.min else "Unknown"
              end_date_str = d_end.strftime('%Y-%m-%d') if d_end != datetime.min else "Unknown"
-             
              date_range = f"From {dates_sorted[0]} to {dates_sorted[-1]}"
         else:
              date_range = "Unknown"
 
         mask_suffix = "-masked" if mask else ""
-        filename = f"Summary_Report-{source_slug}{mask_suffix}_{start_date_str}_to_{end_date_str}.md"
-        out_file_base = os.path.join(report_dir, filename)
         
-        # --- MARKDOWN ---
-        md_file = out_file_base
-        with open(md_file, 'w') as f:
-            f.write(f"# {title_prefix}\n\n")
+        if is_individual:
+            filename_detailed = f"Summary_Report-{source_slug}.md"
+            filename_briefing = None # No briefing for individuals
+        else:
+            filename_detailed = f"Detailed_Speaker_Report-{source_slug}{mask_suffix}_{start_date_str}_to_{end_date_str}.md"
+            filename_briefing = f"Executive_Briefing-{source_slug}{mask_suffix}_{start_date_str}_to_{end_date_str}.md"
+        
+        out_file_detailed_md = os.path.join(report_dir, filename_detailed)
+        out_file_briefing_md = os.path.join(report_dir, filename_briefing) if filename_briefing else None
+        
+        # --- Generate Briefing Data ---
+
+        unique_affiliations = list(set([r.get('affiliation', 'NONE') for r in filtered_results]))
+        affiliation_categories = self._categorize_affiliations(unique_affiliations)
+        
+        sentiment_cats = self.prompts.get('sentiment_categories', ['Neutral'])
+        representative_voices = self._select_representative_voices(filtered_results, sentiment_cats)
+        
+        # --- MARKDOWN DETAILED REPORT ---
+        with open(out_file_detailed_md, 'w') as f:
+            f.write(f"# Speaker Detailed Report - {source_name}\n\n")
             f.write(f"**Topic**: {topic}\n\n")
             f.write(f"**Prompt**: {self.prompts.get('analysis_instructions', 'Default prompt')}\n\n")
             f.write(f"**Time Period**: {date_range}\n\n")
@@ -786,54 +910,15 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
             f.write("## Organizations and Affiliations That Spoke - Excluding People Who Represented Only Themselves\n")
             f.write("| Organization name | Number of Speakers | Sentiment | Meetings Spoken At |\n")
             f.write("|---|---|---|---|\n")
-            
+
             # Aggregate by Organization
             org_counts = {}
             
-            def is_none_affiliation(a):
-                if not a: return True
-                a_lower = a.lower().strip()
-                
-                # Exact matches or starts with
-                if a_lower == 'none' or a_lower.startswith('none ('): return True
-                if a_lower == 'no affiliation stated': return True
-                
-                # Keyword matches
-                keywords = [
-                    'no affiliation',
-                    'no organization',
-                    'no formal organization',
-                    'no specific organization',
-                    '(individual)',
-                    '(private citizen)',
-                    '(individual citizen)',
-                    '(self-identified)'
-                ]
-                if any(kw in a_lower for kw in keywords): return True
-                
-                # Specific edge cases from LLM output
-                if "speaker's name is mentioned, but no organizational affiliation is provided" in a_lower: return True
-                if "speaker's personal affiliation not mentioned" in a_lower: return True
-                if "affiliation is not explicitly mentioned" in a_lower: return True
-                
-                # Individual professions without organization
-                if a_lower == 'author': return True
-                if a_lower == 'austin small business owner': return True
-                if a_lower == 'healthcare worker (specifically in mental health)': return True
-                if a_lower == 'licensed professional counselor, palestinian american muslim woman': return True
-                if a_lower == 'palestinian christian born and raised in bethlehem': return True
-                if a_lower.startswith('resident of district'): return True
-                if a_lower == 'district 3 (presumably a local government district)': return True
-                if a_lower == 'israeli (note: the speaker mentions being "israeli" but does not provide a specific organization affiliation)': return True
-                if a_lower == 'jewish community': return True
-                
-                return False
-
             for res in filtered_results: # Use filtered_results here
                 if res.get('metadata_only'): continue
                 affil = res.get('affiliation', '').strip()
                 
-                if is_none_affiliation(affil):
+                if self._is_none_affiliation(affil):
                     affil = 'None (Individuals)'
                 
                 if affil not in org_counts:
@@ -887,91 +972,199 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
             f.write("\n---\n")
             f.write("© Copyright 2026. Joel Greenberg. All Rights Reserved. Contact the author at joelontheroad@proton.me\n")
 
-        self.log.success(f"Markdown Report generated: {md_file}")
+        self.log.success(f"Markdown Detailed Report generated: {out_file_detailed_md}")
 
-        # --- HTML ---
-        html_file = out_file_base.replace('.md', '.html')
-        with open(html_file, 'w') as f:
-            # Basic HTML structure
+        # --- HTML DETAILED REPORT ---
+        html_detailed = out_file_detailed_md.replace('.md', '.html')
+        with open(html_detailed, 'w') as f:
+            # High-End Shared CSS
             style = """
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
+            :root {
+                --primary: #0f172a;
+                --secondary: #334155;
+                --accent-blue: #2563eb;
+                --accent-red: #dc2626;
+                --bg: #f8fafc;
+                --card-bg: #ffffff;
+                --text-main: #1e293b;
+                --text-muted: #64748b;
+                --border: #e2e8f0;
+            }
+            body { 
+                font-family: 'Inter', -apple-system, sans-serif; 
+                background: var(--bg); 
+                color: var(--text-main);
+                margin: 0; padding: 0; 
+                line-height: 1.6;
+            }
+            .header {
+                background: var(--primary);
+                color: white;
+                padding: 3rem 2rem;
+                text-align: center;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            }
+            .header h1 { margin: 0; font-size: 2.5rem; letter-spacing: -0.025em; }
+            .header p { font-size: 1.25rem; opacity: 0.8; margin-top: 0.5rem; }
+            .header .meta { 
+                margin-top: 1rem; 
+                font-family: monospace; 
+                color: #94a3b8; 
+                text-transform: uppercase; 
+                letter-spacing: 0.1em; 
+            }
+            .container { max-width: 1200px; margin: -2rem auto 4rem; padding: 0 1rem; }
+            .dashboard {
+                display: flex;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+                padding-bottom: 1rem;
+            }
+            .stat-card {
+                flex: 0 0 240px;
+                background: var(--card-bg);
+                padding: 1.5rem;
+                border-radius: 0.75rem;
+                box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                text-align: center;
+                border: 1px solid var(--border);
+            }
+            .stat-card .label { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem; text-align: center; }
+            .stat-card .value { font-size: 2rem; font-weight: 800; color: var(--primary); text-align: center; }
+            
+            .content-section {
+                background: var(--card-bg);
+                padding: 2.5rem;
+                border-radius: 1rem;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                margin-bottom: 2rem;
+                border: 1px solid var(--border);
+                overflow-x: auto;
+            }
+            
+            table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+            th { text-align: left; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; padding: 1rem; border-bottom: 2px solid var(--border); }
+            td { padding: 1rem; border-bottom: 1px solid var(--border); }
+            
+            .pill {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0.25rem 0.75rem;
+                border-radius: 9999px;
+                font-size: 0.7rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                text-align: center;
+                min-width: 100px;
+            }
+            .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
+            .pill-pro-israel { background: #fee2e2; color: #991b1b; }
+            .pill-neutral { background: #f1f5f9; color: #475569; }
+            
+            .watch-btn {
+                background: var(--primary);
+                color: white;
+                text-decoration: none;
+                padding: 0.4rem 0.8rem;
+                border-radius: 0.375rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                transition: background 0.2s;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                min-width: 120px;
+            }
+            .watch-btn:hover { background: var(--accent-blue); }
+            .center-col { text-align: center; }
             """
             
-            # Dynamically seed CSS colors for whatever categories the user chose in the yaml
-            categories = self.prompts.get('sentiment_categories', ['Neutral'])
-            colors = ['#ffe0e0', '#e0e0ff', '#e0ffe0', '#ffffe0', '#fff0e0', '#f0e0ff', '#f0f0f0']
-            for i, cat in enumerate(categories):
-                cls_name = cat.lower().replace(' ', '-')
-                color = colors[i % len(colors)] if cat.lower() != 'neutral' else '#f0f0f0'
-                style += f"            .sentiment-{cls_name} {{ background-color: {color}; }}\n"
-            style += f"            .sentiment-unknown {{ background-color: #f0f0f0; }}\n"
-            
             title_text = f"{title_prefix} - {date_range}"
-            f.write(f"<html><head><title>{title_text}</title><style>{style}</style></head><body>")
-            f.write(f"<h1>{title_prefix}</h1>")
-            f.write(f"<p><strong>Topic:</strong> {topic}</p>")
-            f.write(f"<p><strong>Prompt:</strong> {self.prompts.get('analysis_instructions', 'Default prompt')}</p>")
-            f.write(f"<p><strong>Time Period:</strong> {date_range}</p>")
+            f.write(f"<!DOCTYPE html><html><head><title>{title_text}</title><style>{style}</style></head><body>")
             
-            if self.fm.get_ai_setting('analysis', 'mask_names'):
-                f.write(f"<p><strong>Names in this report have been masked for privacy.</strong></p>")
-                
-            f.write("<h2>Summary Statistics</h2>")
-            pct_on_topic = (total_on_topic / total_all_topics) * 100 if total_all_topics > 0 else 0
-            f.write(f"<p><strong>Total Speakers:</strong> {total_all_topics}</p>")
-            f.write(f"<p><strong>Speakers on Topic:</strong> {total_on_topic}</p>")
-            f.write(f"<p><strong>Percentage on Topic:</strong> {pct_on_topic:.0f}%</p>")
-
-            f.write("<table><thead><tr><th>Sentiment</th><th>Count</th><th>% on Topic</th><th>% Total</th></tr></thead><tbody>")
+            # Header
+            f.write(f"<div class='header'>")
+            f.write(f"<div class='meta'>|| COMPREHENSIVE ANALYSIS ||</div>")
+            f.write(f"<h1>{source_name}: Speaker Detailed Report</h1>")
+            f.write(f"<p>{date_range}</p>")
+            f.write(f"</div>")
+            
+            f.write("<div class='container'>")
+            
+            # Dashboard
+            f.write("<div class='dashboard'>")
+            f.write(f"<div class='stat-card'><div class='label'>Total Speakers</div><div class='value'>{total_all_topics}</div></div>")
+            f.write(f"<div class='stat-card'><div class='label'>On-topic speakers</div><div class='value'>{total_on_topic}</div></div>")
             for stat in stats:
-                f.write(f"<tr><td>{stat['sentiment']}</td><td>{stat['count']}</td><td>{stat['pct_on_topic']}</td><td>{stat['pct_all']}</td></tr>")
-            f.write("</tbody></table>")
+                f.write(f"<div class='stat-card'><div class='label'>{stat['sentiment']}</div><div class='value'>{stat['pct_on_topic']}</div></div>")
+            f.write("</div>")
             
+            pct_on_topic_val = (total_on_topic / total_all_topics * 100) if total_all_topics > 0 else 0
+            f.write(f"<div style='text-align: center; margin-bottom: 2rem; font-weight: 700; font-size: 1.2rem; color: var(--primary);'>Percentage of Speakers on Topic: {pct_on_topic_val:.1f}%</div>")
+
+            # Methodology Component
+            f.write("<div class='content-section'>")
+            f.write("<h2>Full Analysis Context</h2>")
+            f.write(f"<p><strong>Topic:</strong> {topic}</p>")
+            f.write(f"<p style='font-family: monospace; font-size: 0.8rem; background: #f1f5f9; padding: 1rem; border-radius: 0.5rem;'><strong>Prompt:</strong> {self.prompts.get('analysis_instructions', 'Default prompt')}</p>")
+            if self.fm.get_ai_setting('analysis', 'mask_names'):
+                f.write(f"<p style='color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names in this report have been masked.</p>")
+            f.write("</div>")
+                
             # HTML Table 1
-            f.write("<h2>Number Times an On Topic Speaker Spoke at Meetings</h2>")
-            f.write("<table><thead><tr><th>Name</th><th>Number of Times Speaking</th><th>Sentiment</th></tr></thead><tbody>")
+            f.write("<div class='content-section'>")
+            f.write("<h2>Speaker Frequency Analysis</h2>")
+            f.write("<table><thead><tr><th>Name</th><th>Meetings</th><th>Primary Sentiment</th></tr></thead><tbody>")
             for name, data in sorted_speakers:
                 from collections import Counter
                 common_s = Counter(data['sentiments']).most_common(1)[0][0]
-                f.write(f"<tr><td>{name}</td><td>{data['count']}</td><td>{common_s}</td></tr>")
+                cat_pill = f"pill pill-{common_s.lower().replace(' ', '-')}"
+                f.write(f"<tr><td><strong>{name}</strong></td><td>{data['count']}</td><td><span class='{cat_pill}'>{common_s}</span></td></tr>")
             f.write("</tbody></table>")
+            f.write("</div>")
 
             # HTML Table 2
-            f.write("<h2>Organizations and Affiliations That Spoke</h2>")
-            f.write("<table><thead><tr><th>Organization name</th><th>Number of Speakers</th><th>Sentiment</th></tr></thead><tbody>")
+            f.write("<div class='content-section'>")
+            f.write("<h2>Organizational Presence</h2>")
+            f.write("<table><thead><tr><th>Organization</th><th>Unique Speakers</th><th>Primary Sentiment</th></tr></thead><tbody>")
             for org, data in sorted_orgs:
                 count = len(data['speakers'])
                 from collections import Counter
                 common_s = Counter(data['sentiments']).most_common(1)[0][0]
-                f.write(f"<tr><td>{org}</td><td>{count}</td><td>{common_s}</td></tr>")
+                cat_pill = f"pill pill-{common_s.lower().replace(' ', '-')}"
+                f.write(f"<tr><td>{org}</td><td>{count}</td><td><span class='{cat_pill}'>{common_s}</span></td></tr>")
             f.write("</tbody></table>")
+            f.write("</div>")
             
-            # HTML Table 3: Meetings Covered in This Report
+            # HTML Table 3: Meetings Covered
             if all_meetings_metadata:
-                f.write("<h2>Meetings Covered in This Report</h2>")
-                f.write("<table><thead><tr><th>Meeting</th><th>Date</th><th>On Topic Speakers?</th></tr></thead><tbody>")
-                
+                f.write("<div class='content-section'>")
+                f.write("<h2>Meetings Analyzed</h2>")
+                f.write("<table><thead><tr><th>Meeting Title</th><th>Date</th><th>Relevant Comments</th></tr></thead><tbody>")
                 sorted_meetings = sorted(all_meetings_metadata, key=lambda x: parse_date(x['date']))
                 for m in sorted_meetings:
                     on_topic = "Yes" if m['has_on_topic'] else "No"
                     f.write(f"<tr><td>{m['meeting']}</td><td>{m['date']}</td><td>{on_topic}</td></tr>")
                 f.write("</tbody></table>")
+                f.write("</div>")
 
-            f.write("<h2>Detailed Analysis</h2>")
+            # Detailed Analysis
+            f.write("<div class='content-section'>")
+            f.write("<h2>Detailed Speaker Analysis</h2>")
             f.write("""
                 <table>
                     <thead>
                     <tr>
                         <th>Speaker</th>
-                        <th>Affiliation</th>
-                        <th>Sentiment</th>
-                        <th>Summarized Statements</th>
-                        <th>Meeting</th>
-                        <th>Original Video</th>
+                        <th class='center-col'>Affiliation</th>
+                        <th class='center-col'>Sentiment</th>
+                        <th>Summarized Statement</th>
+                        <th class='center-col'>Watch Video</th>
+                        <th class='center-col'>Meeting</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -983,18 +1176,268 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
                 if not affil or affil.strip() == '' or affil.upper() == 'NONE': affil = "NONE"
                 video_url_with_timestamp = res['original_video']
                 timestamp_link = self._format_timestamp(res['start_time'])
+                cat_pill = f"pill pill-{res['sentiment'].lower().replace(' ', '-')}"
                 
                 f.write("<tr>")
-                f.write(f"<td><strong>{res['speaker']}</strong></td>")
-                f.write(f"<td>{affil}</td>")
-                f.write(f"<td class='sentiment-{res['sentiment'].lower().replace(' ', '-')}'>{res['sentiment']}</td>")
-                f.write(f"<td>{clean_ex}</td>")
-                f.write(f"<td>{res['meeting']}<br><small>{res['summary_file']}</small></td>")
-                f.write(f"<td><a href='{video_url_with_timestamp}' target='_blank'>Watch at {timestamp_link}</a></td>")
+                f.write(f"<td><strong>{res['speaker']}</strong><br><small style='color: var(--text-muted)'>{res['meeting']}</small></td>")
+                f.write(f"<td class='center-col'>{affil}</td>")
+                f.write(f"<td class='center-col'><span class='{cat_pill}'>{res['sentiment']}</span></td>")
+                f.write(f"<td style='min-width: 300px;'>{clean_ex}</td>")
+                f.write(f"<td class='center-col'><a href='{video_url_with_timestamp}' target='_blank' class='watch-btn'>Watch at {timestamp_link}</a></td>")
+                f.write(f"<td class='center-col'>{res.get('date', '')}</td>")
                 f.write("</tr>")
             f.write("</tbody></table>")
-            f.write("<hr>")
-            f.write("<p>&copy; Copyright 2026. Joel Greenberg. All Rights Reserved. Contact the author at joelontheroad@proton.me</p>")
-            f.write("</body></html>")
+            f.write("</div>")
+            
+            f.write("<div style='text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 2rem;'>")
+            f.write("&copy; Copyright 2026. Joel Greenberg. All Rights Reserved. Contact the author at joelontheroad@proton.me")
+            f.write("</div>")
+            f.write("</div></body></html>")
 
-        self.log.success(f"HTML Report generated: {html_file}")
+        self.log.success(f"HTML Detailed Report generated: {html_detailed}")
+
+        # --- HTML EXECUTIVE BRIEFING ---
+        if out_file_briefing_md:
+            # --- Markdown Executive Briefing ---
+            with open(out_file_briefing_md, 'w') as f:
+                f.write(f"# {briefing_title}\n\n")
+                f.write(f"**Topic**: {topic}\n")
+                f.write(f"**Time Period**: {date_range}\n\n")
+                
+                f.write("## Dashboard\n")
+                f.write(f"- Total Speakers Analyzed: {total_all_topics}\n")
+                f.write(f"- Speakers on Topic: {total_on_topic} ({pct_on_topic_val:.1f}%)\n")
+                for s in stats:
+                    f.write(f"- {s['sentiment']}: {s['count']} ({s['pct_on_topic']} of on-topic)\n")
+                f.write("\n")
+
+            # --- HTML EXECUTIVE BRIEFING ---
+            html_briefing = out_file_briefing_md.replace('.md', '.html')
+            with open(html_briefing, 'w') as f:
+                # Modern, High-End CSS
+                style = """
+                :root {
+                    --primary: #0f172a;
+                    --secondary: #334155;
+                    --accent-blue: #2563eb;
+                    --accent-red: #dc2626;
+                    --bg: #f8fafc;
+                    --card-bg: #ffffff;
+                    --text-main: #1e293b;
+                    --text-muted: #64748b;
+                    --border: #e2e8f0;
+                }
+                body { 
+                    font-family: 'Inter', -apple-system, sans-serif; 
+                    background: var(--bg); 
+                    color: var(--text-main);
+                    margin: 0; padding: 0; 
+                    line-height: 1.6;
+                }
+                .header {
+                    background: var(--primary);
+                    color: white;
+                    padding: 3rem 2rem;
+                    text-align: center;
+                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                }
+                .header h1 { margin: 0; font-size: 2.5rem; letter-spacing: -0.025em; }
+                .header .meta { 
+                    margin-top: 1rem; 
+                    font-family: monospace; 
+                    color: #94a3b8; 
+                    text-transform: uppercase; 
+                    letter-spacing: 0.1em; 
+                }
+                .container { max-width: 1000px; margin: -2rem auto 4rem; padding: 0 1rem; }
+                .dashboard {
+                    display: flex;
+                    flex-wrap: nowrap;
+                    overflow-x: auto;
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
+                    padding-bottom: 1rem;
+                }
+                .stat-card {
+                    flex: 0 0 220px;
+                    background: var(--card-bg);
+                    padding: 1.5rem;
+                    border-radius: 0.75rem;
+                    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                    text-align: center;
+                    border: 1px solid var(--border);
+                }
+                .stat-card .label { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem; }
+                .stat-card .value { font-size: 2rem; font-weight: 800; color: var(--primary); }
+                
+                .content-section {
+                    background: var(--card-bg);
+                    padding: 2.5rem;
+                    border-radius: 1rem;
+                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                    margin-bottom: 2rem;
+                    border: 1px solid var(--border);
+                }
+                .executive-summary {
+                    border-left: 5px solid var(--accent-blue);
+                    background: #f1f5f9;
+                    padding: 1.5rem;
+                    font-style: italic;
+                    font-size: 1.1rem;
+                    margin: 1.5rem 0;
+                }
+                .methodology {
+                    background: #1e293b;
+                    color: #cbd5e1;
+                    padding: 1.5rem;
+                    border-radius: 0.5rem;
+                    font-family: 'Fira Code', monospace;
+                    font-size: 0.85rem;
+                    margin-bottom: 2rem;
+                }
+                .methodology h3 { color: white; margin-top: 0; font-size: 1rem; }
+                
+                table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+                th { text-align: left; color: var(--text-muted); text-transform: uppercase; font-size: 0.75rem; padding: 1rem; border-bottom: 2px solid var(--border); }
+                td { padding: 1rem; border-bottom: 1px solid var(--border); }
+                
+                .pill {
+                    display: inline-block;
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 9999px;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                }
+                .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
+                .pill-pro-israel { background: #fee2e2; color: #991b1b; }
+                .pill-neutral { background: #f1f5f9; color: #475569; }
+                
+                .voice-card {
+                    border: 1px solid var(--border);
+                    border-radius: 0.5rem;
+                    padding: 1.5rem;
+                    margin-bottom: 1rem;
+                }
+                .voice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+                .voice-speaker { font-weight: 700; font-size: 1.1rem; }
+                .watch-btn {
+                    background: var(--primary);
+                    color: white;
+                    text-decoration: none;
+                    padding: 0.5rem 1rem;
+                    border-radius: 0.375rem;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    transition: background 0.2s;
+                }
+                .watch-btn:hover { background: var(--accent-blue); }
+                """
+                
+                # Start HTML
+                f.write(f"<!DOCTYPE html><html><head><title>{briefing_title}</title><style>{style}</style></head><body>")
+                
+                # Header
+                f.write(f"<div class='header'>")
+                f.write(f"<div class='meta'>INTELLIGENCE BRIEF // OFFICIAL RECORD</div>")
+                f.write(f"<h1>{source_name}: Gaza Conflict Public Response</h1>")
+                f.write(f"<p style='font-size: 1.25rem; opacity: 0.8; margin-top: 0.5rem;'>{date_range}</p>")
+                f.write(f"</div>")
+                
+                f.write("<div class='container'>")
+                
+                # Dashboard
+                f.write("<div class='dashboard'>")
+                eb_items = []
+                eb_items.append(f"<div class='stat-card'><div class='label'>Total Speakers</div><div class='value'>{total_all_topics}</div></div>")
+                eb_items.append(f"<div class='stat-card'><div class='label'>On-topic speakers</div><div class='value'>{total_on_topic}</div></div>")
+                for stat in stats:
+                    eb_items.append(f"<div class='stat-card'><div class='label'>{stat['sentiment']}</div><div class='value'>{stat['pct_on_topic']}</div></div>")
+                
+                for item in eb_items[::-1]:
+                    f.write(item)
+                f.write("</div>")
+                
+                # Methodology
+                f.write("<div class='methodology'>")
+                f.write("<h3>Dataset Methodology</h3>")
+                f.write(f"PROMPT SOURCE: {self.prompts.get('analysis_instructions', 'Default System Prompt')}<br><br>")
+                f.write(f"SENTIMENT CLASSES: {', '.join(sentiment_cats)}<br>")
+                f.write(f"SCOPE: Generated on {datetime.now().strftime('%Y-%m-%d')} for {source_name} workspace.")
+                f.write("</div>")
+                
+                # Top 10 Speakers
+                f.write("<div class='content-section'>")
+                f.write("<h2>Most Frequent Speakers</h2>")
+                f.write("<table><thead><tr><th>Name</th><th>Appearances</th><th>Primary Sentiment</th></tr></thead><tbody>")
+                for name, data in sorted_speakers[:10]:
+                     from collections import Counter
+                     common_s = Counter(data['sentiments']).most_common(1)[0][0]
+                     cat_pill = f"pill pill-{common_s.lower().replace(' ', '-')}"
+                     f.write(f"<tr><td><strong>{name}</strong></td><td>{data['count']} meetings</td><td><span class='{cat_pill}'>{common_s}</span></td></tr>")
+                f.write("</tbody></table>")
+                f.write("</div>")
+                
+                # Categorized Organizations
+                f.write("<div class='content-section'>")
+                f.write("<h2>Organizational Footprint</h2>")
+                
+                # Group orgs by category
+                by_category = {cat: [] for cat in self.org_categories}
+                for org, data in sorted_orgs:
+                    cat = affiliation_categories.get(org, "Other / Uncategorized")
+                    if cat in by_category:
+                        by_category[cat].append((org, data))
+                    else:
+                        if "Other / Uncategorized" not in by_category: by_category["Other / Uncategorized"] = []
+                        by_category["Other / Uncategorized"].append((org, data))
+                
+                for cat_name, org_list in by_category.items():
+                    if not org_list: continue
+                    # filter individual None and empty strings from advocacy lists
+                    filtered_org_list = [o for o in org_list if o[0] != 'None (Individuals)']
+                    if not filtered_org_list and cat_name != "Unaffiliated / Private Citizens": continue
+                    
+                    # If we're in Private Citizens, we WANT the None(Individuals)
+                    display_list = org_list if cat_name == "Unaffiliated / Private Citizens" else filtered_org_list
+                    if not display_list: continue
+
+                    f.write(f"<h3>{cat_name}</h3>")
+                    f.write("<table><thead><tr><th>Organization</th><th>Speakers</th><th>Sentiment</th></tr></thead><tbody>")
+                    for org, data in display_list:
+                        from collections import Counter
+                        common_s = Counter(data['sentiments']).most_common(1)[0][0]
+                        cat_pill = f"pill pill-{common_s.lower().replace(' ', '-')}"
+                        f.write(f"<tr><td>{org}</td><td>{len(data['speakers'])}</td><td><span class='{cat_pill}'>{common_s}</span></td></tr>")
+                    f.write("</tbody></table>")
+                f.write("</div>")
+                
+                # Representative Voices
+                f.write("<div class='content-section'>")
+                f.write("<h2>Representative Voices</h2>")
+                f.write("<p style='color: var(--text-muted); margin-bottom: 2rem;'>Key testimony excerpts that encapsulate the core sentiment of each side.</p>")
+                
+                for cat in sentiment_cats:
+                    voices = representative_voices.get(cat, [])
+                    if not voices: continue
+                    
+                    f.write(f"<div style='margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 1rem;'>")
+                    f.write(f"<h3 style='margin-bottom: 1.5rem;'>Position Category: {cat}</h3>")
+                    for voice in voices:
+                        f.write("<div class='voice-card'>")
+                        f.write("<div class='voice-header'>")
+                        f.write(f"<span class='voice-speaker'>{voice['speaker']}</span>")
+                        f.write(f"<a href='{voice['original_video']}' target='_blank' class='watch-btn'>Watch Speaker</a>")
+                        f.write("</div>")
+                        f.write(f"<p>{voice['example']}</p>")
+                        f.write(f"<div style='font-size: 0.75rem; color: var(--text-muted);'>{voice['meeting']}</div>")
+                        f.write("</div>")
+                    f.write("</div>")
+                f.write("</div>")
+                
+                f.write("<div style='text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 2rem;'>")
+                f.write("REDACTED / FOR INTERNAL REVIEW ONLY // GENERATED BY SPEAKER ANALYZER")
+                f.write("</div>")
+                f.write("</div></body></html>")
+                
+            self.log.success(f"Executive Briefing generated: {html_briefing}")

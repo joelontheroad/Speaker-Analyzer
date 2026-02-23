@@ -45,6 +45,8 @@ class KnowledgeIndexer:
             self.chunk_size = int(self.fm.get_ai_setting('rag', 'chunk_size') or 500)
             
         self.log.info(f"Using RAG database in: {self.rag_dir}")
+        self.log.info(f"Connector Slug: {self.fm.connector_slug}")
+        self.log.info(f"Transcripts Path Resolved: {self.fm.resolve_path('transcripts')}")
         os.makedirs(self.rag_dir, exist_ok=True)
         self.chroma_client = chromadb.PersistentClient(path=self.rag_dir)
         self.collection = self.chroma_client.get_or_create_collection(name="city_council")
@@ -154,7 +156,11 @@ class KnowledgeIndexer:
 
         files = [f for f in os.listdir(trans_dir) if f.endswith('_transcript.json')]
         if not files:
-            self.log.error("No transcript files found in transcripts/ directory.")
+            all_files = os.listdir(trans_dir)
+            self.log.error(f"No transcript files found in: {trans_dir}")
+            self.log.info(f"Directory contains {len(all_files)} files total.")
+            if all_files:
+                self.log.info(f"Sample files: {all_files[:3]}")
             sys.exit(1)
             
         total_files = len(files)

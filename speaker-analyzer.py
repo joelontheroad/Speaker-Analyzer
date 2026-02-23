@@ -348,8 +348,14 @@ def main():
                 possible_path = os.path.join(fm.resolve_path('transcripts'), f"{vid_id}_transcript.json")
                 if os.path.exists(possible_path):
                     target_ids.append(vid_id)
+                else:
+                    print(f"Warning: Transcript not found for '{vid_id}'. Did you forget to run --transcribe first?")
+             
+             if not target_ids:
+                 print("Error: None of the targeted transcripts were found. Aborting.")
+                 sys.exit(1)
         
-        if not target_ids:
+        elif not target_ids:
              # Scan transcripts directory for all available transcripts
              trans_dir = fm.resolve_path('transcripts')
              if os.path.exists(trans_dir):
@@ -419,8 +425,11 @@ def main():
                 processed_transcript_files.append(f"{vid_id}_transcript.json")
                 
                 # run_analysis now returns (results, total_speakers_in_file, meeting_date, meeting_title)
-                # Pass file progress indices
                 results, file_total_speakers, meeting_date, meeting_title = analyzer.run_analysis(trans_path, mask=args.mask, file_index=i, total_files=len(target_ids))
+                
+                on_topic_count = len([r for r in results if not r.get('metadata_only')])
+                print(f"  └─ Found {file_total_speakers} speakers, {on_topic_count} on-topic.")
+                
                 grand_total_speakers += file_total_speakers
                 processed_meeting_dates.append(meeting_date)
                 
@@ -428,11 +437,22 @@ def main():
                 all_meetings_metadata.append({
                     'meeting': meeting_title,
                     'date': meeting_date,
-                    'has_on_topic': bool(results)
+                    'has_on_topic': on_topic_count > 0
                 })
                 
                 if not results:
                     zero_results_files.append(f"{vid_id}_transcript.json")
+                
+                # Generate Individual Report for this meeting
+                report_dir = fm.resolve_path('reports')
+                analyzer.generate_report(results, report_dir, file_total_speakers, 
+                                       all_meeting_dates=[meeting_date],
+                                       all_meetings_metadata=[all_meetings_metadata[-1]],
+                                       mask=args.mask,
+                                       source_name=meeting_title,
+                                       source_slug=f"Meeting-{vid_id}",
+                                       is_individual=True)
+                
                 all_results.extend(results)
         
         if processed_transcript_files: # Generate report if ANY files processed, even if no results
