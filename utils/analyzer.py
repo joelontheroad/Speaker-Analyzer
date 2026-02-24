@@ -814,7 +814,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
         mask_suffix = "-masked" if mask else ""
         
         if is_individual:
-            filename_detailed = f"Summary_Report-{source_slug}.md"
+            filename_detailed = f"Single_Meeting_Report-{source_slug}.md"
             filename_briefing = None # No briefing for individuals
         else:
             filename_detailed = f"Detailed_Speaker_Report-{source_slug}{mask_suffix}_{start_date_str}_to_{end_date_str}.md"
@@ -1018,14 +1018,15 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 display: flex;
                 flex-wrap: nowrap;
                 overflow-x: auto;
-                gap: 1.5rem;
+                gap: 1rem;
                 margin-bottom: 2rem;
                 padding-bottom: 1rem;
             }
             .stat-card {
-                flex: 0 0 240px;
+                flex: 1;
+                min-width: 140px;
                 background: var(--card-bg);
-                padding: 1.5rem;
+                padding: 1.25rem;
                 border-radius: 0.75rem;
                 box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
                 text-align: center;
@@ -1091,6 +1092,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write(f"<div class='meta'>|| COMPREHENSIVE ANALYSIS ||</div>")
             f.write(f"<h1>{source_name}: Speaker Detailed Report</h1>")
             f.write(f"<p>{date_range}</p>")
+            f.write(f"<p style='font-size: 0.9rem; margin-top: 1rem;'>Report Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>")
             f.write(f"</div>")
             
             f.write("<div class='container'>")
@@ -1203,6 +1205,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 f.write(f"# {briefing_title}\n\n")
                 f.write(f"**Topic**: {topic}\n")
                 f.write(f"**Time Period**: {date_range}\n\n")
+                f.write(f"**Report Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
                 
                 f.write("## Dashboard\n")
                 f.write(f"- Total Speakers Analyzed: {total_all_topics}\n")
@@ -1254,14 +1257,15 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                     display: flex;
                     flex-wrap: nowrap;
                     overflow-x: auto;
-                    gap: 1.5rem;
+                    gap: 1rem;
                     margin-bottom: 2rem;
                     padding-bottom: 1rem;
                 }
                 .stat-card {
-                    flex: 0 0 220px;
+                    flex: 1;
+                    min-width: 140px;
                     background: var(--card-bg);
-                    padding: 1.5rem;
+                    padding: 1.25rem;
                     border-radius: 0.75rem;
                     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
                     text-align: center;
@@ -1342,6 +1346,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 f.write(f"<div class='meta'>INTELLIGENCE BRIEF // OFFICIAL RECORD</div>")
                 f.write(f"<h1>{source_name}: Gaza Conflict Public Response</h1>")
                 f.write(f"<p style='font-size: 1.25rem; opacity: 0.8; margin-top: 0.5rem;'>{date_range}</p>")
+                f.write(f"<p style='font-size: 0.9rem; margin-top: 1rem; color: #cbd5e1;'>Report Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>")
                 f.write(f"</div>")
                 
                 f.write("<div class='container'>")

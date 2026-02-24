@@ -8,20 +8,71 @@
 # Copyright (C) 2026 Joel Greenberg
 # **********************************************************
 
+echo "[*] Installing system dependencies (ffmpeg, pip, venv)..."
+if command -v apt-get &> /dev/null; then
+    sudo apt-get update
+    sudo apt-get install -y ffmpeg python3-pip python3-venv
+else
+    echo "[!] apt-get not found. Please install ffmpeg, python3-pip, and python3-venv manually."
+fi
+
+echo "[*] Detecting GPU Hardware..."
+DETECTED_GPU="Unknown"
+if command -v lspci &> /dev/null; then
+    if lspci | grep -iE 'vga|3d|display' | grep -i nvidia &> /dev/null; then
+        DETECTED_GPU="NVIDIA"
+    elif lspci | grep -iE 'vga|3d|display' | grep -iE 'radeon|amd' &> /dev/null; then
+        DETECTED_GPU="AMD"
+    elif lspci | grep -iE 'vga|3d|display' | grep -i intel &> /dev/null; then
+        DETECTED_GPU="Intel"
+    fi
+fi
+
+echo -e "    - Detected GPU Vendor: \033[1m$DETECTED_GPU\033[0m"
+echo "    Would you like to install the corresponding GPU monitoring tools and drivers? (y/N)"
+read -r -p "    Choice: " install_gpu_tools_choice
+if [[ "$install_gpu_tools_choice" =~ ^[Yy]$ ]]; then
+    if [ "$DETECTED_GPU" = "Unknown" ]; then
+        echo "    Could not auto-detect GPU. Please select your GPU vendor:"
+        echo "    1) NVIDIA"
+        echo "    2) AMD"
+        echo "    3) Intel"
+        read -r -p "    Vendor (1-3): " gpu_vendor_choice
+        case $gpu_vendor_choice in
+            1) DETECTED_GPU="NVIDIA" ;;
+            2) DETECTED_GPU="AMD" ;;
+            3) DETECTED_GPU="Intel" ;;
+            *) echo "    [!] Invalid choice. Skipping." ;;
+        esac
+    fi
+
+    if command -v apt-get &> /dev/null; then
+        if [ "$DETECTED_GPU" = "NVIDIA" ]; then
+            echo "    [*] Installing NVIDIA tools..."
+            sudo apt-get install -y ubuntu-drivers-common
+            sudo ubuntu-drivers install
+        elif [ "$DETECTED_GPU" = "AMD" ]; then
+            echo "    [*] Installing AMD tools..."
+            sudo apt-get install -y radeontop
+        elif [ "$DETECTED_GPU" = "Intel" ]; then
+            echo "    [*] Installing Intel tools..."
+            sudo apt-get install -y intel-gpu-tools
+        fi
+    else
+        echo "    [!] apt-get not found. Cannot auto-install $DETECTED_GPU tools."
+    fi
+fi
+echo ""
 echo "[*] Initializing Environment..."
+if [ ! -d ".venv" ]; then
+    echo "    - Creating virtual environment..."
+    python3 -m venv .venv
+fi
 source .venv/bin/activate
 
 echo "[*] Installing core dependencies..."
 pip install --upgrade pip
 pip install wheel setuptools packaging
-
-# System Dependency Block
-if ! command -v ffmpeg &> /dev/null; then
-    echo "[!] ffmpeg is required but not installed."
-    echo "    Please install it using: sudo apt-get install ffmpeg"
-    exit 1
-fi
-
 # The package is 'whisperx'
 echo "[*] Installing AI Stack..."
 # Install Torch with CUDA support first, from PyTorch index

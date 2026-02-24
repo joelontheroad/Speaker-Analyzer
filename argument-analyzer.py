@@ -252,6 +252,7 @@ DO NOT return markdown. Only return valid JSON."""
         arg_to_speakers = {}
         arg_to_links = {}
         all_dates = []
+        speaker_sentiments = {}
 
         total_files = len(files)
         for i, f_name in enumerate(files, 1):
@@ -303,6 +304,7 @@ DO NOT return markdown. Only return valid JSON."""
                 
                 if not self._check_relevance(spk, full_text): continue
                 sentiment = self._analyze_sentiment(spk, full_text)
+                speaker_sentiments[f"{vid_id}_{orig_spk}"] = sentiment
 
                 spk_segments = []
                 for seg in data.get('segments', []):
@@ -381,9 +383,22 @@ DO NOT return markdown. Only return valid JSON."""
             if sorted_dates:
                 date_range = f"From {sorted_dates[0]} to {sorted_dates[-1]}"
         
-        self._generate_report(grouped_results, source_name, source_slug, date_range)
+        speaker_stats = {
+            'total': len(speaker_sentiments),
+            'pro_palestine': 0,
+            'pro_israel': 0
+        }
+        for s in speaker_sentiments.values():
+            if 'Pro-Palestine' in s: speaker_stats['pro_palestine'] += 1
+            elif 'Pro-Israel' in s: speaker_stats['pro_israel'] += 1
+            
+        t = speaker_stats['total']
+        speaker_stats['pct_palestine'] = (speaker_stats['pro_palestine'] / t * 100) if t > 0 else 0
+        speaker_stats['pct_israel'] = (speaker_stats['pro_israel'] / t * 100) if t > 0 else 0
+        
+        self._generate_report(grouped_results, source_name, source_slug, date_range, speaker_stats)
 
-    def _generate_report(self, results, source_name, source_slug, date_range):
+    def _generate_report(self, results, source_name, source_slug, date_range, speaker_stats=None):
         if not results:
             self.log.error("No arguments extracted."); return
             
@@ -396,6 +411,13 @@ DO NOT return markdown. Only return valid JSON."""
             f.write(f"# Semantic Argument Analysis - {source_name}\n\n")
             if date_range: f.write(f"**Time Period:** {date_range}\n\n")
             f.write(f"**Report Generated:** {datetime.datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
+            if speaker_stats:
+                f.write("### Speaker Statistics\n")
+                f.write(f"- Total number of speakers (on-topic): {speaker_stats['total']}\n")
+                f.write(f"- Total Speakers Pro-Palestine: {speaker_stats['pro_palestine']}\n")
+                f.write(f"- Total Speakers Pro-Israel: {speaker_stats['pro_israel']}\n")
+                f.write(f"- % Pro-Palestine: {speaker_stats['pct_palestine']:.1f}%\n")
+                f.write(f"- % Pro-Israel: {speaker_stats['pct_israel']:.1f}%\n\n")
             f.write("This report dynamically groups semantically similar arguments made by speakers into high-level canonical claims.\n\n")
             f.write("| Argument Made | Number of Speakers | Sentiment | Video Links |\n|---|---|---|---|\n")
             for res in results:
@@ -521,7 +543,10 @@ DO NOT return markdown. Only return valid JSON."""
 
             f.write("<div class='dashboard'>")
             f.write(f"<div class='stat-card'><div class='label'>Total Arguments</div><div class='value'>{total_args}</div></div>")
-            f.write(f"<div class='stat-card'><div class='label'>Primary Discourse</div><div class='value'>{top_sentiment}</div></div>")
+            if speaker_stats:
+                f.write(f"<div class='stat-card'><div class='label'>Total Speakers</div><div class='value'>{speaker_stats['total']}</div></div>")
+                f.write(f"<div class='stat-card'><div class='label'>Pro-Palestine</div><div class='value'>{speaker_stats['pro_palestine']}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{speaker_stats['pct_palestine']:.1f}%</span></div></div>")
+                f.write(f"<div class='stat-card'><div class='label'>Pro-Israel</div><div class='value'>{speaker_stats['pro_israel']}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{speaker_stats['pct_israel']:.1f}%</span></div></div>")
             f.write(f"<div class='stat-card'><div class='label'>Report Date</div><div class='value' style='font-size: 1.2rem; padding-top: 0.8rem;'>{datetime.datetime.now().strftime('%b %d, %Y')}</div></div>")
             f.write("</div>")
             

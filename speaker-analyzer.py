@@ -443,16 +443,6 @@ def main():
                 if not results:
                     zero_results_files.append(f"{vid_id}_transcript.json")
                 
-                # Generate Individual Report for this meeting
-                report_dir = fm.resolve_path('reports')
-                analyzer.generate_report(results, report_dir, file_total_speakers, 
-                                       all_meeting_dates=[meeting_date],
-                                       all_meetings_metadata=[all_meetings_metadata[-1]],
-                                       mask=args.mask,
-                                       source_name=meeting_title,
-                                       source_slug=f"Meeting-{vid_id}",
-                                       is_individual=True)
-                
                 all_results.extend(results)
         
         if processed_transcript_files: # Generate report if ANY files processed, even if no results
