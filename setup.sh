@@ -8,12 +8,12 @@
 # Copyright (C) 2026 Joel Greenberg
 # **********************************************************
 
-echo "[*] Installing system dependencies (ffmpeg, pip, venv)..."
+echo "[*] Installing system dependencies (ffmpeg, pip, venv, whiptail)..."
 if command -v apt-get &> /dev/null; then
     sudo apt-get update
-    sudo apt-get install -y ffmpeg python3-pip python3-venv
+    sudo apt-get install -y ffmpeg python3-pip python3-venv whiptail
 else
-    echo "[!] apt-get not found. Please install ffmpeg, python3-pip, and python3-venv manually."
+    echo "[!] apt-get not found. Please install ffmpeg, python3-pip, python3-venv, and whiptail manually."
 fi
 
 echo "[*] Detecting GPU Hardware..."
@@ -29,15 +29,34 @@ if command -v lspci &> /dev/null; then
 fi
 
 echo -e "    - Detected GPU Vendor: \033[1m$DETECTED_GPU\033[0m"
-echo "    Would you like to install the corresponding GPU monitoring tools and drivers? (y/N)"
-read -r -p "    Choice: " install_gpu_tools_choice
+
+# Prompt for GPU tools installation using whiptail (DOS-style dialog)
+if command -v whiptail &> /dev/null; then
+    if whiptail --title "GPU Tools Installation" --yesno "Detected GPU Vendor: $DETECTED_GPU\n\nWould you like to install the corresponding GPU monitoring tools and drivers?" 10 60; then
+        install_gpu_tools_choice="y"
+    else
+        install_gpu_tools_choice="n"
+    fi
+else
+    echo "    Would you like to install the corresponding GPU monitoring tools and drivers? (y/N)"
+    read -r -p "    Choice: " install_gpu_tools_choice
+fi
+
 if [[ "$install_gpu_tools_choice" =~ ^[Yy]$ ]]; then
     if [ "$DETECTED_GPU" = "Unknown" ]; then
-        echo "    Could not auto-detect GPU. Please select your GPU vendor:"
-        echo "    1) NVIDIA"
-        echo "    2) AMD"
-        echo "    3) Intel"
-        read -r -p "    Vendor (1-3): " gpu_vendor_choice
+        if command -v whiptail &> /dev/null; then
+            gpu_vendor_choice=$(whiptail --title "Select GPU Vendor" --menu "Could not auto-detect GPU. Please select your GPU vendor:" 15 50 4 \
+                "1" "NVIDIA" \
+                "2" "AMD" \
+                "3" "Intel" 3>&1 1>&2 2>&3)
+        else
+            echo "    Could not auto-detect GPU. Please select your GPU vendor:"
+            echo "    1) NVIDIA"
+            echo "    2) AMD"
+            echo "    3) Intel"
+            read -r -p "    Vendor (1-3): " gpu_vendor_choice
+        fi
+        
         case $gpu_vendor_choice in
             1) DETECTED_GPU="NVIDIA" ;;
             2) DETECTED_GPU="AMD" ;;
@@ -146,6 +165,13 @@ if command -v nvidia-smi &> /dev/null; then
     else
         echo "    - Low VRAM (<10GB). Using standard limits."
     fi
+elif [ "$DETECTED_GPU" = "NVIDIA" ]; then
+    echo "    - NVIDIA GPU detected via lspci (nvidia-smi not yet available). Assuming Mid-Range optimizations as safe default."
+    CTX_LIMIT=16000
+    INPUT_LIMIT_IDENTITY=10000
+    INPUT_LIMIT_RELEVANCE=12000
+    INPUT_LIMIT_SENTIMENT=12000
+    INPUT_LIMIT_SUMMARY=12000
 else
     echo "    - No NVIDIA GPU detected. Using CPU defaults."
 fi
