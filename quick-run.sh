@@ -7,8 +7,7 @@
 
 
 # Run  indexer
-# ./knowledge-indexer.py --force --connector Austin
+./knowledge-indexer.py --force --connector Austin
 
-# Run argument analyzer
+./knowledge-indexer.py --force --connector Houston
 
-# ./argument-analyzer.py --connector Austin

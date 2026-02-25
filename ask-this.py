@@ -31,13 +31,9 @@ class KnowledgeQuery:
         self.fm = file_manager
         
         self.api_url = self.fm.get_network_setting('llm_api_url') or "http://127.0.0.1:1234"
-        self.rag_config = self.fm.get_ai_setting('rag', 'database_dir')
-        if not self.rag_config:
-            self.rag_dir = self.fm.resolve_path('db')
-            self.emb_model = "nomic-embed-text-v1.5"
-        else:
-            self.rag_dir = self.fm.get_ai_setting('rag', 'database_dir')
-            self.emb_model = self.fm.get_ai_setting('rag', 'embedding_model') or "nomic-embed-text-v1.5"
+        rag_dir_setting = self.fm.get_ai_setting('rag', 'database_dir')
+        self.rag_dir = rag_dir_setting if rag_dir_setting else self.fm.resolve_path('db')
+        self.emb_model = self.fm.get_ai_setting('rag', 'embedding_model') or "nomic-embed-text-v1.5"
             
         if not os.path.exists(self.rag_dir):
             self.log.error(f"Vector Database not found at {self.rag_dir}")

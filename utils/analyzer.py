@@ -361,7 +361,11 @@ If you cannot identify the person, return 'NONE'."""
             if base_url.endswith('/0'):
                 base_url = base_url[:-2]  # Remove /0
             
-            video_link = f"{base_url}?ts={video_timestamp}"
+            # Format timestamp depending on source
+            if 'box.com' in base_url:
+                video_link = f"{base_url}?t={video_timestamp}s"
+            else:
+                video_link = f"{base_url}?ts={video_timestamp}"
             
             # Store both for report
             video_url_original = source_url
@@ -1108,6 +1112,11 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             pct_on_topic_val = (total_on_topic / total_all_topics * 100) if total_all_topics > 0 else 0
             f.write(f"<div style='text-align: center; margin-bottom: 2rem; font-weight: 700; font-size: 1.2rem; color: var(--primary);'>Percentage of Speakers on Topic: {pct_on_topic_val:.1f}%</div>")
 
+            # Check if this report likely uses Box media (by inspecting the first non-metadata result)
+            uses_box = any('box.com' in r.get('original_video', '') for r in filtered_results)
+            if uses_box:
+                f.write("<div style='text-align: center; margin-bottom: 2rem; font-size: 0.9rem; color: var(--accent-red); padding: 0 2rem;'><em>Note: Linking into media files is not natively supported by Box.com. Audio files will resume from your last paused position or the beginning of the meeting. Please use the timecodes under 'Watch Video' to navigate manually.</em></div>")
+
             # Methodology Component
             f.write("<div class='content-section'>")
             f.write("<h2>Full Analysis Context</h2>")
@@ -1363,6 +1372,9 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                     f.write(item)
                 f.write("</div>")
                 
+                if uses_box:
+                    f.write("<div style='text-align: center; margin-bottom: 2rem; font-size: 0.9rem; color: var(--accent-red); padding: 0 2rem;'><em>Note: Linking into media files is not natively supported by Box.com. Audio files will resume from your last paused position or the beginning of the meeting. Please use the timecodes under 'Watch Video' to navigate manually.</em></div>")
+
                 # Methodology
                 f.write("<div class='methodology'>")
                 f.write("<h3>Dataset Methodology</h3>")
