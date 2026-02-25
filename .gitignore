@@ -33,11 +33,23 @@ Thumbs.db
 questions-to-ask.txt
 run-all.sh
 run-some.sh
+quick-run.sh
+run-austin.sh
+run-houston.sh
 tmp_processing/
 transcribe-all.txt
 transcribe-final.txt
 transcribe-these-videos.txt
 voice_biometrics_research.md
+austin-HRC-meetings.txt
+dallas-city-council-meetings.txt
+debug_output.txt
+questions-to-ask.txt
+test_katz.py
+test_houston_connector.py
+
+
+
 
 # --- Local Workspaces ---
 /workspaces/

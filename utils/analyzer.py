@@ -516,12 +516,15 @@ Respond with ONLY: Relevant or Not-Relevant"""
                 content = resp_json['choices'][0]['message']['content'].strip()
                 self.log.info(f"Relevance check for '{speaker}': '{content}'")
                 
-                # Check for relevant
-                if 'relevant' in content.lower() and 'not' not in content.lower():
-                    return True
-                else:
+                # Check for relevant explicitly
+                lower_content = content.lower()
+                if 'not-relevant' in lower_content or 'not relevant' in lower_content:
                     self.log.info(f"Skipping irrelevant speaker: {speaker}")
                     return False
+                elif 'relevant' in lower_content:
+                    return True
+                else:
+                    return True # Default to true if confusing response
             else:
                 # If LLM fails, assume relevant to avoid losing data
                 return True
@@ -843,8 +846,8 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write(f"**Time Period**: {date_range}\n\n")
             f.write(f"**Report Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
             
-            if self.fm.get_ai_setting('analysis', 'mask_names'):
-                f.write("Names in this report have been masked for privacy.\n\n")
+            if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                f.write("Names have been anonymized for privacy.\n\n")
 
             # --- Export Sentiment Manifest for RAG DB Injection (one file per video) ---
             from collections import defaultdict
@@ -1122,8 +1125,8 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write("<h2>Full Analysis Context</h2>")
             f.write(f"<p><strong>Topic:</strong> {topic}</p>")
             f.write(f"<p style='font-family: monospace; font-size: 0.8rem; background: #f1f5f9; padding: 1rem; border-radius: 0.5rem;'><strong>Prompt:</strong> {self.prompts.get('analysis_instructions', 'Default prompt')}</p>")
-            if self.fm.get_ai_setting('analysis', 'mask_names'):
-                f.write(f"<p style='color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names in this report have been masked.</p>")
+            if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                f.write(f"<p style='color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</p>")
             f.write("</div>")
                 
             # HTML Table 1
@@ -1216,6 +1219,9 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 f.write(f"**Time Period**: {date_range}\n\n")
                 f.write(f"**Report Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
                 
+                if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                    f.write("Names have been anonymized for privacy.\n\n")
+
                 f.write("## Dashboard\n")
                 f.write(f"- Total Speakers Analyzed: {total_all_topics}\n")
                 f.write(f"- Speakers on Topic: {total_on_topic} ({pct_on_topic_val:.1f}%)\n")
@@ -1360,6 +1366,9 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 
                 f.write("<div class='container'>")
                 
+                if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                    f.write("<div style='text-align: center; margin-bottom: 2rem; color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
+
                 # Dashboard
                 f.write("<div class='dashboard'>")
                 eb_items = []

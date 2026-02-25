@@ -302,6 +302,9 @@ Context:
             if is_new_file:
                 f.write(f"# Knowledge Base Queries\n\n")
             
+            if mask:
+                f.write("Names have been anonymized for privacy.\n\n")
+
             f.write(f"## Q: {query}\n\n")
             f.write(f"{md_answer}\n\n")
             
@@ -349,6 +352,9 @@ Context:
             if is_new_file:
                 f.write('<h1>Knowledge Base Query</h1>')
                 
+            if mask:
+                f.write('<div style="color: #e74c3c; font-weight: bold; margin-bottom: 20px;">PRIVACY NOTICE: Names have been anonymized for privacy.</div>')
+
             f.write(f'<div class="question">Q: {query}</div>')
             f.write(f'<div class="answer">{html_answer}</div>')
             

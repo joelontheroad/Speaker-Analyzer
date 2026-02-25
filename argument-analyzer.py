@@ -411,6 +411,8 @@ DO NOT return markdown. Only return valid JSON."""
             f.write(f"# Semantic Argument Analysis - {source_name}\n\n")
             if date_range: f.write(f"**Time Period:** {date_range}\n\n")
             f.write(f"**Report Generated:** {datetime.datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
+            if self.mask:
+                f.write("Names have been anonymized for privacy.\n\n")
             if speaker_stats:
                 f.write("### Speaker Statistics\n")
                 f.write(f"- Total number of speakers (on-topic): {speaker_stats['total']}\n")
@@ -534,6 +536,9 @@ DO NOT return markdown. Only return valid JSON."""
             
             f.write("<div class='container'>")
             
+            if self.mask:
+                f.write("<div style='text-align: center; margin-bottom: 2rem; color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
+
             # Dashboard
             total_args = len(results)
             top_sentiment = "N/A"
