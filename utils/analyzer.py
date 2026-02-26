@@ -32,10 +32,16 @@ class Analyzer:
         ]
 
     def _load_prompts(self):
-        try:
-            with open("configs/prompts.yaml", 'r') as f:
-                return yaml.safe_load(f)
-        except: return {}
+        return self.fm.load_yaml("configs/prompts.yaml")
+
+    def _get_topic(self):
+        prompt_text = self.prompts.get('analysis_instructions', '')
+        if not prompt_text:
+            return "General Analysis"
+        topic_match = re.search(r'Topic:\s*"?([^"]+)"?', prompt_text, re.IGNORECASE)
+        if topic_match:
+            return topic_match.group(1).strip()
+        return prompt_text.strip()
 
     def _get_spinner(self):
         char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
@@ -44,12 +50,8 @@ class Analyzer:
 
     def _get_llm_config(self):
         """Get LLM configuration from defaults.yaml"""
-        try:
-            with open("configs/defaults.yaml", 'r') as f:
-                config = yaml.safe_load(f)
-                return config.get('ai_settings', {}).get('llm', {})
-        except:
-            return {}
+        config = self.fm.load_yaml("configs/defaults.yaml")
+        return config.get('ai_settings', {}).get('llm', {})
 
     def _spinner_update(self, message):
         """Update spinner animation"""
@@ -107,7 +109,7 @@ Do not invent affiliations. If they say "I am a mother", that is not an organiza
         
         try:
             url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            resp = requests.post(url, json=payload, timeout=10)
+            resp = requests.post(url, json=payload, timeout=60)
             
             if resp.status_code == 200:
                 resp_json = resp.json()
@@ -185,7 +187,7 @@ If you cannot identify the person, return 'NONE'."""
         
         try:
             url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            resp = requests.post(url, json=payload, timeout=15)
+            resp = requests.post(url, json=payload, timeout=60)
             if resp.status_code == 200:
                 content = resp.json()['choices'][0]['message']['content'].strip()
                 if "NONE" in content.upper():
@@ -401,15 +403,18 @@ If you cannot identify the person, return 'NONE'."""
         limit = llm_config.get('max_input_tokens', {}).get('sentiment', 12000)
 
         keywords_list = self.prompts.get('keywords', [])
-        keywords_str = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+        keywords_str = ", ".join(map(str, keywords_list)) if isinstance(keywords_list, list) else str(keywords_list)
         
         # Load dynamic user instructions
-        topic = "The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs"
+        topic = self._get_topic()
         sentiment_instructions = self.prompts.get('sentiment_instructions', '')
-        categories = self.prompts.get('sentiment_categories', ['Pro-Israel', 'Pro-Palestine', 'Neutral'])
+        categories = self.prompts.get('sentiment_categories', ['Neutral'])
         categories_str = ", ".join(categories)
         
-        system_prompt = f"""You are analyzing public comment sentiment on the following topic: {topic}.
+        system_prompt = f"""You are analyzing public comment sentiment.
+
+Analysis Instructions / Topic:
+{topic}
 
 Keywords for context: {keywords_str}
 
@@ -437,7 +442,7 @@ Respond with ONLY these exact labels: {categories_str}."""
                 self.log.debug(f"LLM Request URL: {url}")
                 self.log.debug(f"LLM Payload: {payload}")
             
-            resp = requests.post(url, json=payload, timeout=30)
+            resp = requests.post(url, json=payload, timeout=120)
             
             if hasattr(self.log, 'debug'):
                 self.log.debug(f"LLM Response Status: {resp.status_code}")
@@ -472,20 +477,20 @@ Respond with ONLY these exact labels: {categories_str}."""
         limit = llm_config.get('max_input_tokens', {}).get('relevance', 12000)
 
         keywords_list = self.prompts.get('keywords', [])
-        keywords_str = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
-        topic = "The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs"
+        keywords_str = ", ".join(map(str, keywords_list)) if isinstance(keywords_list, list) else str(keywords_list)
+        topic = self._get_topic()
         
-        system_prompt = f"""You are filtering public comments for relevance to this topic: {topic}.
+        system_prompt = f"""You are filtering public comments for relevance.
+
+Analysis Instructions / Topic:
+{topic}
 
 Keywords: {keywords_str}
 
-Determine if the speaker's statement is relevant to this topic. A statement is relevant if it discusses:
-- Israel, Palestine, Gaza, or the conflict
-- Related policies, resolutions, or political positions
-- International relations concerning this conflict
+Determine if the speaker's statement is relevant to this topic. A statement is relevant if it discusses the topic or any of the keywords.
 
 A statement is NOT relevant if it only discusses:
-- Unrelated local issues (dances, community events, housing initiatives unrelated to the conflict)
+- Unrelated local issues (dances, community events, housing initiatives unrelated to the topic)
 - Procedural matters with no connection to the topic
 - Completely different subjects
 
@@ -509,7 +514,7 @@ Respond with ONLY: Relevant or Not-Relevant"""
         
         try:
             url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            resp = requests.post(url, json=payload, timeout=30)
+            resp = requests.post(url, json=payload, timeout=120)
             
             if resp.status_code == 200:
                 resp_json = resp.json()
@@ -572,19 +577,22 @@ Respond with ONLY: Relevant or Not-Relevant"""
                         text = pattern.sub("the speaker", text)
 
         keywords_list = self.prompts.get('keywords', [])
-        keywords_str = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
+        keywords_str = ", ".join(map(str, keywords_list)) if isinstance(keywords_list, list) else str(keywords_list)
         
-        topic = "The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs"
+        topic = self._get_topic()
         
         mask_instruction = ""
         if mask:
             mask_instruction = "\n\nCRITICAL: If the provided statement contains the speaker's real name, YOU MUST NOT use it in the summary. Use only the identifier 'the speaker' or the provided masked ID (e.g., Speaker #1234). Do not reveal the person's identity under any circumstances."
 
-        system_prompt = f"""You are summarizing public comments on: {topic}.
+        system_prompt = f"""You are summarizing public comments.
+
+Analysis Instructions / Topic:
+{topic}
 
 Keywords for context: {keywords_str}
 
-Generate a concise summary of 3-4 sentences covering the speaker's main points and position. Be objective and factual.{mask_instruction}"""
+Generate a concise summary of 3-4 sentences covering the speaker's main points and position regarding the topic. Be objective and factual.{mask_instruction}"""
 
         payload_text = text[:limit]
         self.log.info(f"Summary Generation: Sending {len(payload_text)} chars to LLM for speaker '{speaker}' (Limit: {limit})")
@@ -602,7 +610,7 @@ Generate a concise summary of 3-4 sentences covering the speaker's main points a
         
         try:
             url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            resp = requests.post(url, json=payload, timeout=30)
+            resp = requests.post(url, json=payload, timeout=120)
             
             if resp.status_code == 200:
                 resp_json = resp.json()
@@ -709,7 +717,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
         try:
             self._spinner_update("Categorizing organizations for executive briefing...")
             url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
-            resp = requests.post(url, json=payload, timeout=30)
+            resp = requests.post(url, json=payload, timeout=60)
             if resp.status_code == 200:
                 content = resp.json()['choices'][0]['message']['content'].strip()
                 mapping = json.loads(content)
@@ -795,9 +803,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             })
             
         # Header Info
-        prompt_text = self.prompts.get('analysis_instructions', '')
-        topic_match = re.search(r'Topic:\s*(.*?)(?:\.|$)', prompt_text)
-        topic = topic_match.group(1) if topic_match else "Unknown Topic"
+        topic = self._get_topic()
         
         if all_meeting_dates:
             dates = [d for d in all_meeting_dates if d != 'Unknown Date']
@@ -1068,9 +1074,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 text-align: center;
                 min-width: 100px;
             }
-            .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
-            .pill-pro-israel { background: #fee2e2; color: #991b1b; }
-            .pill-neutral { background: #f1f5f9; color: #475569; }
+            /* PILL_STYLES_PLACEHOLDER */
             
             .watch-btn {
                 background: var(--primary);
@@ -1090,6 +1094,23 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             .watch-btn:hover { background: var(--accent-blue); }
             .center-col { text-align: center; }
             """
+            
+            sentiment_colors = [
+                {"bg": "#dbeafe", "fg": "#1e40af"}, # blue
+                {"bg": "#fee2e2", "fg": "#991b1b"}, # red
+                {"bg": "#dcfce7", "fg": "#166534"}, # green
+                {"bg": "#f3e8ff", "fg": "#6b21a8"}, # purple
+                {"bg": "#fef3c7", "fg": "#92400e"}  # yellow
+            ]
+            pill_styles = ""
+            for i, cat in enumerate(self.prompts.get('sentiment_categories', ['Neutral'])):
+                color = sentiment_colors[i % len(sentiment_colors)]
+                slug = cat.lower().replace(' ', '-')
+                pill_styles += f".pill-{slug} {{ background: {color['bg']}; color: {color['fg']}; }}\n            "
+            if ".pill-neutral" not in pill_styles:
+                pill_styles += ".pill-neutral { background: #f1f5f9; color: #475569; }\n            "
+                
+            style = style.replace("/* PILL_STYLES_PLACEHOLDER */", pill_styles)
             
             title_text = f"{title_prefix} - {date_range}"
             f.write(f"<!DOCTYPE html><html><head><title>{title_text}</title><style>{style}</style></head><body>")
@@ -1126,7 +1147,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write(f"<p><strong>Topic:</strong> {topic}</p>")
             f.write(f"<p style='font-family: monospace; font-size: 0.8rem; background: #f1f5f9; padding: 1rem; border-radius: 0.5rem;'><strong>Prompt:</strong> {self.prompts.get('analysis_instructions', 'Default prompt')}</p>")
             if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
-                f.write(f"<p style='color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</p>")
+                f.write(f"<p style='color: white; font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</p>")
             f.write("</div>")
                 
             # HTML Table 1
@@ -1328,9 +1349,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                     font-weight: 700;
                     text-transform: uppercase;
                 }
-                .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
-                .pill-pro-israel { background: #fee2e2; color: #991b1b; }
-                .pill-neutral { background: #f1f5f9; color: #475569; }
+                /* PILL_STYLES_PLACEHOLDER */
                 
                 .voice-card {
                     border: 1px solid var(--border);
@@ -1353,13 +1372,30 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 .watch-btn:hover { background: var(--accent-blue); }
                 """
                 
+                sentiment_colors = [
+                    {"bg": "#dbeafe", "fg": "#1e40af"}, # blue
+                    {"bg": "#fee2e2", "fg": "#991b1b"}, # red
+                    {"bg": "#dcfce7", "fg": "#166534"}, # green
+                    {"bg": "#f3e8ff", "fg": "#6b21a8"}, # purple
+                    {"bg": "#fef3c7", "fg": "#92400e"}  # yellow
+                ]
+                pill_styles = ""
+                for i, cat in enumerate(self.prompts.get('sentiment_categories', ['Neutral'])):
+                    color = sentiment_colors[i % len(sentiment_colors)]
+                    slug = cat.lower().replace(' ', '-')
+                    pill_styles += f".pill-{slug} {{ background: {color['bg']}; color: {color['fg']}; }}\n                "
+                if ".pill-neutral" not in pill_styles:
+                    pill_styles += ".pill-neutral { background: #f1f5f9; color: #475569; }\n                "
+                    
+                style = style.replace("/* PILL_STYLES_PLACEHOLDER */", pill_styles)
+                
                 # Start HTML
                 f.write(f"<!DOCTYPE html><html><head><title>{briefing_title}</title><style>{style}</style></head><body>")
                 
                 # Header
                 f.write(f"<div class='header'>")
                 f.write(f"<div class='meta'>INTELLIGENCE BRIEF // OFFICIAL RECORD</div>")
-                f.write(f"<h1>{source_name}: Gaza Conflict Public Response</h1>")
+                f.write(f"<h1>{source_name}: Speaker Analysis Briefing</h1>")
                 f.write(f"<p style='font-size: 1.25rem; opacity: 0.8; margin-top: 0.5rem;'>{date_range}</p>")
                 f.write(f"<p style='font-size: 0.9rem; margin-top: 1rem; color: #cbd5e1;'>Report Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>")
                 f.write(f"</div>")
@@ -1367,7 +1403,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 f.write("<div class='container'>")
                 
                 if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
-                    f.write("<div style='text-align: center; margin-bottom: 2rem; color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
+                    f.write("<div style='text-align: center; margin-bottom: 2rem; color: white; font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
 
                 # Dashboard
                 f.write("<div class='dashboard'>")

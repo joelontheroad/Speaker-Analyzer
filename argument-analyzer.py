@@ -35,16 +35,22 @@ class ArgumentAnalyzer:
         self.log.info(f"Transcripts Path Resolved: {self.fm.resolve_path('transcripts')}")
         # Load prompts directly from config via FileManager (standardized in earlier turns)
         # But for standalone, we reload them
-        try:
-            with open("configs/prompts.yaml", 'r') as f:
-                self.prompts = yaml.safe_load(f)
-        except: self.prompts = {}
+        self.prompts = self.fm.load_yaml("configs/prompts.yaml")
         
         self.api_url = self.fm.get_network_setting('llm_api_url')
         if not self.api_url: self.api_url = "http://127.0.0.1:1234"
         
         self.spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         self.spinner_idx = 0
+
+    def _get_topic(self):
+        prompt_text = self.prompts.get('analysis_instructions', '')
+        if not prompt_text:
+            return "General Analysis"
+        topic_match = re.search(r'Topic:\s*"?([^"]+)"?', prompt_text, re.IGNORECASE)
+        if topic_match:
+            return topic_match.group(1).strip()
+        return prompt_text.strip()
 
     def _get_spinner(self):
         char = self.spinner_chars[self.spinner_idx % len(self.spinner_chars)]
@@ -67,21 +73,24 @@ class ArgumentAnalyzer:
         limit = llm_config.get('max_input_tokens', {}).get('relevance', 12000)
 
         keywords_list = self.prompts.get('keywords', [])
-        keywords_str = ", ".join(keywords_list) if isinstance(keywords_list, list) else str(keywords_list)
-        topic = "The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs"
+        keywords_str = ", ".join(map(str, keywords_list)) if isinstance(keywords_list, list) else str(keywords_list)
+        topic = self._get_topic()
         
-        system_prompt = f"""You are filtering public comments for relevance to this topic: {topic}.
+        system_prompt = f"""You are filtering public comments for relevance.
+
+Analysis Instructions / Topic:
+{topic}
 
 Keywords: {keywords_str}
 
-Determine if the speaker's statement is relevant to this topic. A statement is relevant if it discusses:
-- Israel, Palestine, Gaza, or the conflict
-- Related policies, resolutions, or political positions
-- International relations concerning this conflict
+Determine if the speaker's statement is relevant to this topic. A statement is relevant if it discusses the topic or any of the keywords.
 
 A statement is NOT relevant if it only discusses:
-- Unrelated local issues, procedural matters, or completely different subjects
+- Unrelated local issues (dances, community events, housing initiatives unrelated to the topic)
+- Procedural matters with no connection to the topic
+- Completely different subjects
 
+IMPORTANT: Ignore personal introductions, pleasantries, or rambling starts. Focus on the core message.
 Respond with ONLY: Relevant or Not-Relevant"""
 
         payload_text = text[:limit]
@@ -112,9 +121,9 @@ Respond with ONLY: Relevant or Not-Relevant"""
         """Classify sentiment."""
         llm_config = self._get_llm_config()
         limit = llm_config.get('max_input_tokens', {}).get('sentiment', 12000)
-        topic = "The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs"
+        topic = self._get_topic()
         sentiment_instructions = self.prompts.get('sentiment_instructions', '')
-        categories = self.prompts.get('sentiment_categories', ['Pro-Israel', 'Pro-Palestine', 'Neutral'])
+        categories = self.prompts.get('sentiment_categories', ['Neutral'])
         categories_str = ", ".join(categories)
         
         system_prompt = f"""You are analyzing public comment sentiment on the following topic: {topic}.
@@ -383,18 +392,23 @@ DO NOT return markdown. Only return valid JSON."""
             if sorted_dates:
                 date_range = f"From {sorted_dates[0]} to {sorted_dates[-1]}"
         
+        categories = self.prompts.get('sentiment_categories', ['Neutral'])
         speaker_stats = {
             'total': len(speaker_sentiments),
-            'pro_palestine': 0,
-            'pro_israel': 0
+            'categories': categories
         }
+        for cat in categories:
+            speaker_stats[cat] = 0
+            
         for s in speaker_sentiments.values():
-            if 'Pro-Palestine' in s: speaker_stats['pro_palestine'] += 1
-            elif 'Pro-Israel' in s: speaker_stats['pro_israel'] += 1
+            for cat in categories:
+                if cat in s or s in cat: 
+                    speaker_stats[cat] += 1
+                    break
             
         t = speaker_stats['total']
-        speaker_stats['pct_palestine'] = (speaker_stats['pro_palestine'] / t * 100) if t > 0 else 0
-        speaker_stats['pct_israel'] = (speaker_stats['pro_israel'] / t * 100) if t > 0 else 0
+        for cat in categories:
+            speaker_stats[f"pct_{cat}"] = (speaker_stats[cat] / t * 100) if t > 0 else 0
         
         self._generate_report(grouped_results, source_name, source_slug, date_range, speaker_stats)
 
@@ -416,10 +430,12 @@ DO NOT return markdown. Only return valid JSON."""
             if speaker_stats:
                 f.write("### Speaker Statistics\n")
                 f.write(f"- Total number of speakers (on-topic): {speaker_stats['total']}\n")
-                f.write(f"- Total Speakers Pro-Palestine: {speaker_stats['pro_palestine']}\n")
-                f.write(f"- Total Speakers Pro-Israel: {speaker_stats['pro_israel']}\n")
-                f.write(f"- % Pro-Palestine: {speaker_stats['pct_palestine']:.1f}%\n")
-                f.write(f"- % Pro-Israel: {speaker_stats['pct_israel']:.1f}%\n\n")
+                
+                for cat in speaker_stats.get('categories', []):
+                    f.write(f"- Total Speakers {cat}: {speaker_stats.get(cat, 0)}\n")
+                for cat in speaker_stats.get('categories', []):
+                    f.write(f"- % {cat}: {speaker_stats.get(f'pct_{cat}', 0):.1f}%\n")
+                f.write("\n")
             f.write("This report dynamically groups semantically similar arguments made by speakers into high-level canonical claims.\n\n")
             f.write("| Argument Made | Number of Speakers | Sentiment | Video Links |\n|---|---|---|---|\n")
             for res in results:
@@ -505,9 +521,7 @@ DO NOT return markdown. Only return valid JSON."""
                 font-weight: 700;
                 text-transform: uppercase;
             }
-            .pill-pro-palestine { background: #dbeafe; color: #1e40af; }
-            .pill-pro-israel { background: #fee2e2; color: #991b1b; }
-            .pill-neutral { background: #f1f5f9; color: #475569; }
+            /* PILL_STYLES_PLACEHOLDER */
             
             .watch-btn {
                 background: var(--primary);
@@ -525,6 +539,24 @@ DO NOT return markdown. Only return valid JSON."""
             .watch-btn:hover { background: var(--accent-blue); }
             """
             
+            sentiment_colors = [
+                {"bg": "#dbeafe", "fg": "#1e40af"}, # blue
+                {"bg": "#fee2e2", "fg": "#991b1b"}, # red
+                {"bg": "#dcfce7", "fg": "#166534"}, # green
+                {"bg": "#f3e8ff", "fg": "#6b21a8"}, # purple
+                {"bg": "#fef3c7", "fg": "#92400e"}  # yellow
+            ]
+            pill_styles = ""
+            cats = speaker_stats.get('categories', ['Neutral']) if speaker_stats else ['Neutral']
+            for i, cat in enumerate(cats):
+                color = sentiment_colors[i % len(sentiment_colors)]
+                slug = cat.lower().replace(' ', '-')
+                pill_styles += f".pill-{slug} {{ background: {color['bg']}; color: {color['fg']}; }}\n            "
+            if ".pill-neutral" not in pill_styles:
+                pill_styles += ".pill-neutral { background: #f1f5f9; color: #475569; }\n            "
+                
+            style = style.replace("/* PILL_STYLES_PLACEHOLDER */", pill_styles)
+            
             f.write(f"<!DOCTYPE html><html><head><title>Semantic Argument Analysis - {source_name}</title><style>{style}</style></head><body>")
             
             # Header
@@ -537,7 +569,7 @@ DO NOT return markdown. Only return valid JSON."""
             f.write("<div class='container'>")
             
             if self.mask:
-                f.write("<div style='text-align: center; margin-bottom: 2rem; color: var(--accent-red); font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
+                f.write("<div style='text-align: center; margin-bottom: 2rem; color: white; font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
 
             # Dashboard
             total_args = len(results)
@@ -550,8 +582,10 @@ DO NOT return markdown. Only return valid JSON."""
             f.write(f"<div class='stat-card'><div class='label'>Total Arguments</div><div class='value'>{total_args}</div></div>")
             if speaker_stats:
                 f.write(f"<div class='stat-card'><div class='label'>Total Speakers</div><div class='value'>{speaker_stats['total']}</div></div>")
-                f.write(f"<div class='stat-card'><div class='label'>Pro-Palestine</div><div class='value'>{speaker_stats['pro_palestine']}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{speaker_stats['pct_palestine']:.1f}%</span></div></div>")
-                f.write(f"<div class='stat-card'><div class='label'>Pro-Israel</div><div class='value'>{speaker_stats['pro_israel']}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{speaker_stats['pct_israel']:.1f}%</span></div></div>")
+                for cat in speaker_stats.get('categories', []):
+                    count = speaker_stats.get(cat, 0)
+                    pct = speaker_stats.get(f"pct_{cat}", 0)
+                    f.write(f"<div class='stat-card'><div class='label'>{cat}</div><div class='value'>{count}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{pct:.1f}%</span></div></div>")
             f.write(f"<div class='stat-card'><div class='label'>Report Date</div><div class='value' style='font-size: 1.2rem; padding-top: 0.8rem;'>{datetime.datetime.now().strftime('%b %d, %Y')}</div></div>")
             f.write("</div>")
             

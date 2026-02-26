@@ -1,0 +1,62 @@
+# **********************************************************
+# Public Meeting Speaker Analyzer
+# file: configs/prompts.yaml
+# Version: 0.1.0
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Joel Greenberg
+# **********************************************************
+
+# -----------------------------------------------------------------------------
+# ANALYSIS INSTRUCTIONS
+# -----------------------------------------------------------------------------
+# This is the primary system prompt that tells the LLM what its role is and 
+# how it should analyze the text. You can change the "Topic" and the 
+# specific focus (e.g., policy advisor, community organizer) here.
+analysis_instructions: >
+  Topic: "You are a reporter for local media.  Austin has a long history of friction with its police force and minority communities.  Report on all issues related to law enforcement and policing. Identify each speaker that discusses any issue related to local law enforcement, the police, or any law enforcement action.   Report on their sentiment, either pro or con. Use the following keywords to expand general knowledge about law enforcement and policing. Keywords: {keywords}."
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CATEGORIES
+# -----------------------------------------------------------------------------
+# Define the labels you want the AI to use for sentiment classification.
+# The AI will respond with ONLY one of these exact strings.
+sentiment_categories:
+- "Pro-Police"
+- "Con-Police"
+- "Neutral"
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CLASSIFICATION RULES
+# -----------------------------------------------------------------------------
+# Detailed criteria for each sentiment category. Adjust these to tune how 
+# sensitive the AI is to specific rhetoric or talking points.
+sentiment_instructions: |
+  - **Pro-Police** Generally supports the police. Wants to provide what they need to effectively do their job. Believes they are generally doing a  good job and sees a need to keep them safe.
+  - **Con-Police **  Generally believes the police exist to keep minorities down. Has strong affinity to chants of "Defund the police." Believes all police are racist.
+  - **Neutral** Believes police are necessary, but may need some things to allieviate chronic issues.  Generally supports training that helps police de-escalate situations. Is open to readusting budgets to include more mental health deputies so that people with mental health problems don't enter the prison system inadvertently.
+
+
+    RHETORICAL INFERENCE:
+          Carefully analyze the tone of the statement. If a speaker is using irony, sarcasm, or quoting an opposing side's talking points rhetorically (e.g., as a hostile polemic rather than a genuine expression of sympathy or support), you MUST identify the speaker's true underlying sentiment instead of taking the isolated words literally. Only attribute statements to their face value if they are genuine.   DO NOT default to Neutral if any clear position is stated.
+
+
+# -----------------------------------------------------------------------------
+# KEYWORDS (TOPIC EXPANSION)
+# -----------------------------------------------------------------------------
+# A list of words/phrases that help the LLM identify relevant discussion.
+# These tokens are often linked to specific political or social movements.
+keywords:
+- use of force
+- excessive use of force
+- neighborhood policing
+- detective
+- interrogation
+- arrest
+- indictment
+- incarceration
+- 911
+- 311
+- police brutality
+- fraternal order of police
+

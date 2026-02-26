@@ -219,3 +219,74 @@ A validation utility used to "dry-run" your input URLs before starting a long tr
 
 ### The Program's Approach to Privacy and Security ###
 This program was designed as a "Private AI". It assumes media files are downloaded from the public internet to a private network behind an industry standard firewall and that all analysis are done on GPU's located in the network behind that firewall. The intent is that all files stay within this private network. The connects to the Internet for two specific tasks: 1) downloading video files and 2) getting authorization from Hugging Face to use a transcription service on the local drive; this happens each time the program is run. In this way, all analysis and reporting is private.  The program doesn not enforce this requirement, so it's assumed that the user will use it that way. By using an encrypted hard drive for the media files, you may actually be able to pass some security certifications, but there are no guarantees. If this an issue, consult a compliance professional. Future versions may eliminate the need for getting validation every time from Hugging Face.  If you already have have a media database, you can point to it via defaults.yaml and not have to go out to the Internet.
+
+**This Program Was Created wit Agentic AI**
+This program was created with Google Antigravity and agentic AI programming tool. It started as a human readable specification from which much of this README.md file came. The program was released on github nine days later. The iterative programming process consisted of running the program, seeing bugs, or a thinking up new functionality, and then communicating that to Antigravity.  
+
+Sometimes the prompts for new functionality were simple, such as:
+"Ensure that setup.sh installs all necessary dependencies."
+
+Sometimes they were more complex:
+"Just like the Austin City Council meeting archives, we're going to look at the Houston city council meeting archives.  While they use swagit as well and the screen format is very similar (if not identical), their agenda is a little different. The public comments section is not of a fixed length. Heres a sample web page of a Houston City Council Meeting:" and then details would follow.
+
+What are the implications?  The iterative development was fast. However, no human has done a code review at the time the software was released.  
+
+Antigravity was asked to review the code against GDPR, NIST 800-122, and ISO27001 certifications.  The code is not currently compliant, but probably could be made to be compliant with an additional develpment effort. Major new areas to be developed include, but are not limited to:
+- encryption of data in motion and at rest.  This most likely means using https to talk to the LLM rather than http (or using a reverse proxy), and putting the data on an encrypted hard drive.
+- More robust protection of speaker's privacy with 1) automatic name masking during the transcription phase, and 2) automatic deletion of media files after transcription is done.
+- Integration with an existing ACL, or creation of an account system in order to control access.
+- Robust access logging
+- A mechanism to delete speaker's requests for deletion in order to meet GDPR requirements
+
+Note that this list is most likely not complete.
+
+Antigravity was also asked to a code license review of all the dependencies the program uses.  All dependencies were found to use licenses that were compatible with the existing license. This is what it reported: 
+
+--- Begin Antigravity Output ---
+The following dependencies were identified across 
+
+requirements.txt,
+system installation scripts (setup.sh), 
+and dynamic Python imports. 
+
+All identified licenses are compatible with AGPLv3:
+
+### Python Dependencies (Explicit & Implicit)
+
+|Dependency|License|AGPLv3 Compatible?|Notes|
+|---|---|---|---|
+|`requests`|Apache 2.0|Yes|Permissive|
+|`beautifulsoup4`|MIT|Yes|Permissive|
+|`pyyaml`|MIT|Yes|Permissive|
+|`yt-dlp`|Unlicense|Yes|Public Domain equivalent|
+|`chromadb`|Apache 2.0|Yes|Permissive|
+|`numpy`|BSD 3-Clause|Yes|Permissive|
+|`ctranslate2`|MIT|Yes|Permissive|
+|`torchcodec`|BSD 3-Clause|Yes|Permissive|
+|`torch` / `torchaudio`|BSD-style|Yes|Permissive|
+|`whisperx`|BSD 2-Clause|Yes|Permissive|
+
+### System & External Executables
+
+| Dependency | License    | AGPLv3 Compatible? | Notes                   |
+| ---------- | ---------- | ------------------ | ----------------------- |
+| `ffmpeg`   | GPL / LGPL | Yes                | Called via `subprocess` |
+| `whiptail` | GPL        | Yes                | Called in setup scripts |
+--- End Antigravity Output ---
+
+However, Antigravity noted a point of friction:
+
+--- Begin Antigravity Output ---
+While the software licenses are legally compatible, there is a significant discrepancy regarding the Pyannote Speaker Diarization model (pyannote/speaker-diarization-3.1) used dynamically by whisperx for speaker identification.
+
+WARNING
+
+Gated Model Access for Pyannote While pyannote.audio and its models are nominally licensed under the MIT License, the model weights are hosted on Hugging Face as a "Gated Model".
+
+Why this is a discrepancy:
+
+Access Restrictions: To download the model, users are strictly required to create a Hugging Face account, accept specific user conditions, and share their contact information with the Pyannote authors.
+
+AGPLv3 Friction: AGPLv3 (Section 10) explicitly states: "You may not impose any further restrictions on the exercise of the rights granted or affirmed under this License." By tying a core functionality of speaker-analyzer to a component that restricts anonymous, automated downloading, the application introduces friction.
+
+--- End Antigravity Output ---

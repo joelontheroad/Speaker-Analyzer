@@ -182,8 +182,8 @@ import yaml
 
 config_path = 'configs/defaults.yaml'
 try:
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f) or {}
+    from utils.file_manager import FileManager
+    config = FileManager.load_yaml(config_path)
     
     if 'ai_settings' not in config: config['ai_settings'] = {}
     if 'llm' not in config['ai_settings']: config['ai_settings']['llm'] = {}

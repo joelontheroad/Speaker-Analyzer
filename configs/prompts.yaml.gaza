@@ -1,0 +1,96 @@
+# **********************************************************
+# Public Meeting Speaker Analyzer
+# file: configs/prompts.yaml
+# Version: 0.1.0
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Joel Greenberg
+# **********************************************************
+
+# -----------------------------------------------------------------------------
+# ANALYSIS INSTRUCTIONS
+# -----------------------------------------------------------------------------
+# This is the primary system prompt that tells the LLM what its role is and 
+# how it should analyze the text. You can change the "Topic" and the 
+# specific focus (e.g., policy advisor, community organizer) here.
+analysis_instructions: "Topic: The Gaza war and the ongoing conflict between Israel and the Palestinian Arabs. You are political policy advisor reporting on the public's comments during city council meetings. Specifically, you are reporting on comments around the Gaza war and the on going conflict between Israel and the Palestinian Arabs. While this is a local meeting in the United States, there are protests happening in the streets and foreign entities funding activities in the US. Identify each speaker that speaks about Israel or the Palestinians Arabs and their sentiment, either pro or con. Use the provide keywords to expand general knowledge about the conflict, the parties involved, and other entities peripherally involved in the conflict. Keywords: {keywords}"
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CATEGORIES
+# -----------------------------------------------------------------------------
+# Define the labels you want the AI to use for sentiment classification.
+# The AI will respond with ONLY one of these exact strings.
+sentiment_categories:
+  - "Pro-Israel"
+  - "Pro-Palestine"
+  - "Neutral"
+
+# -----------------------------------------------------------------------------
+# SENTIMENT CLASSIFICATION RULES
+# -----------------------------------------------------------------------------
+# Detailed criteria for each sentiment category. Adjust these to tune how 
+# sensitive the AI is to specific rhetoric or talking points.
+sentiment_instructions: |
+  CRITICAL CLASSIFICATION RULES:
+  - **Pro-Palestine** (supports Palestinian cause): Speaker supports Palestinians, criticizes Israel's actions, calls for Gaza ceasefire, mentions Israeli genocide/war crimes, supports BDS movement, references "From the River to the Sea", expresses solidarity with Palestinian rights, condemns Israeli occupation, calls for humanitarian aid to Gaza, criticizes U.S. support for Israel. ANY speaker who identifies as Jewish (e.g., Jewish Voice for Peace, Jewish Poets for Peace, Democratic Socialists of America) but speaks out against Israel or Zionism MUST be marked as Pro-Palestine.
+  - **Pro-Israel** (supports Israeli position): Speaker supports Israel's right to defend itself, criticizes Hamas/Palestinian militants, justifies IDF military operations, opposes BDS, defends Israel against accusations of war crimes, emphasizes Israeli security concerns, condemns Hamas attacks, supports continued U.S. aid to Israel
+  - **Neutral**: ONLY if speaker is genuinely balanced OR discussing unrelated procedural matters OR mentions the conflict without taking any side whatsoever
+
+  RHETORICAL INFERENCE:
+  Carefully analyze the tone of the statement. If a speaker is using irony, sarcasm, or quoting an opposing side's talking points rhetorically (e.g., as a hostile polemic rather than a genuine expression of sympathy or support), you MUST identify the speaker's true underlying sentiment instead of taking the isolated words literally. Only attribute statements to their face value if they are genuine.
+
+  DO NOT default to Neutral if any clear position is stated. If the speaker expresses ANY support for Palestinians or criticism of Israel, classify as "Pro-Palestine". If they express ANY support for Israel or criticism of Palestinians/Hamas, classify as "Pro-Israel".
+
+# -----------------------------------------------------------------------------
+# KEYWORDS (TOPIC EXPANSION)
+# -----------------------------------------------------------------------------
+# A list of words/phrases that help the LLM identify relevant discussion.
+# These tokens are often linked to specific political or social movements.
+keywords:
+    - "Zionist"
+    - "Zionism"
+    - "Zio"
+    - "IDF"
+    - "IOF"
+    - "Liars"
+    - "Lying"
+    - "SJP"
+    - "Student Justice For Palestine"
+    - "Hamas"
+    - "Iran"
+    - "Irgc"
+    - "Jews"
+    - "Judaism"
+    - "Muslims"
+    - "Islam"
+    - "Christianity"
+    - "Genocide"
+    - "ADL"
+    - "Anti-Defamation League"
+    - "ZOG"
+    - "Zionist Occupied Government"
+    - "From the River to the Sea"
+    - "Palestine will be free"
+    - "Colonizer"
+    - "White colonizer"
+    - "Colonial power"
+    - "Zionist Entity"
+    - "Nazi"
+    - "Gaza"
+    - "Murder"
+    - "Murders"
+    - "Palestine"
+    - "Palestinians"
+    - "International Law"
+    - "Protest"
+    - "As a jew"
+    - "My jewish friends"
+    - "My muslim friends"
+    - "My arab friends"
+    - "Refugee"
+    - "U.N."
+    - "United Nations"
+    - "Baby killer"
+    - "War crime"
+    - "Sharia"
+    - "Muslim Brotherhood"
