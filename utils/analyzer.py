@@ -224,18 +224,40 @@ If you cannot identify the person, return 'NONE'."""
         
         # Extract date - try from metadata first, then parse from title
         meeting_date = metadata.get('date', 'Unknown Date')
-        if meeting_date.lower() in ['unknown', 'unknown date']:
-            self.log.warning(f"SKIPPING {video_id}: Meeting has invalid/unknown date metadata. Please delete results for this meeting and re-run.")
-            return [], 0, None, video_id
-            
         meeting_title = metadata.get('title', video_id)
-        if meeting_date == 'Unknown Date':
-            title = metadata.get('title', '')
-            # Try to extract date from title like "Mar 21, 2024 City Council Meetings"
+        
+        # If the date is missing or "Unknown", try to recover it from the title
+        if not meeting_date or str(meeting_date).lower() in ['unknown', 'unknown date']:
             import re
-            date_match = re.search(r'([A-Za-z]{3,}\.?\s+\d{1,2},\s+\d{4})', title)
-            if date_match:
-                meeting_date = date_match.group(1)
+            # Try to extract date from title:
+            # 1. "Oct 19, 2023" or "October 19, 2023"
+            # 2. "10/11/2023" or "10-11-2023" (Common in Houston/Dallas)
+            # 3. "2023-10-11"
+            patterns = [
+                r'([A-Z][a-z]{2,}\.?\s+\d{1,2},\s+\d{4})',
+                r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
+                r'(\d{4}-\d{2}-\d{2})'
+            ]
+            
+            for pattern in patterns:
+                date_match = re.search(pattern, meeting_title)
+                if date_match:
+                    meeting_date = date_match.group(1)
+                    self.log.info(f"Recovered missing date '{meeting_date}' from title for {video_id}")
+                
+                # Backfill the metadata file so we don't have to do this every time
+                if metadata:
+                    metadata['date'] = meeting_date
+                    try:
+                        with open(meta_path, 'w') as f:
+                            json.dump(metadata, f, indent=4)
+                    except Exception as e:
+                        self.log.debug(f"Failed to backfill metadata for {video_id}: {e}")
+
+        # Final strict check: If we still don't have a valid date, we MUST skip to avoid report bugs
+        if not meeting_date or str(meeting_date).lower() in ['unknown', 'unknown date']:
+            self.log.warning(f"SKIPPING {video_id}: Meeting has invalid/unknown date metadata and recovery failed. Please delete results for this meeting and re-run.")
+            return [], 0, None, video_id
         
         source_url = metadata.get('source_url', '')
         
@@ -768,7 +790,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 clean_date = date_str.replace('Sept ', 'Sep ').replace('Sept. ', 'Sep. ')
                 
                 # Try parsing common formats
-                for fmt in ['%b %d, %Y', '%B %d, %Y', '%Y-%m-%d', '%b. %d, %Y']:
+                for fmt in ['%b %d, %Y', '%B %d, %Y', '%Y-%m-%d', '%b. %d, %Y', '%m/%d/%Y', '%m/%d/%y']: # Added new formats
                     try:
                         return datetime.strptime(clean_date, fmt)
                     except:

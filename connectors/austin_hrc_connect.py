@@ -36,7 +36,7 @@ class AustinHRCConnector:
             date_str = self._find_meeting_date(url)
             
             return {
-                "title": "Austin Human Rights Commission",
+                "title": f"Austin Human Rights Commission - {date_str}" if date_str else "Austin Human Rights Commission",
                 "date": date_str,
                 "offset": 0,
                 "media_url": media_url,
