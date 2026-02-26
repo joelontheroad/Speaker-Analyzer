@@ -824,7 +824,8 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
         else:
              date_range = "Unknown"
 
-        mask_suffix = "-masked" if mask else ""
+        effective_mask = mask or self.fm.get_ai_setting('analysis', 'mask_names')
+        mask_suffix = "-masked" if effective_mask else ""
         
         if is_individual:
             filename_detailed = f"Single_Meeting_Report-{source_slug}.md"
@@ -852,7 +853,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write(f"**Time Period**: {date_range}\n\n")
             f.write(f"**Report Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
             
-            if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+            if effective_mask:
                 f.write("Names have been anonymized for privacy.\n\n")
 
             # --- Export Sentiment Manifest for RAG DB Injection (one file per video) ---
@@ -1146,7 +1147,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
             f.write("<h2>Full Analysis Context</h2>")
             f.write(f"<p><strong>Topic:</strong> {topic}</p>")
             f.write(f"<p style='font-family: monospace; font-size: 0.8rem; background: #f1f5f9; padding: 1rem; border-radius: 0.5rem;'><strong>Prompt:</strong> {self.prompts.get('analysis_instructions', 'Default prompt')}</p>")
-            if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+            if effective_mask:
                 f.write(f"<p style='color: white; font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</p>")
             f.write("</div>")
                 
@@ -1240,7 +1241,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 f.write(f"**Time Period**: {date_range}\n\n")
                 f.write(f"**Report Generated**: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n\n")
                 
-                if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                if effective_mask:
                     f.write("Names have been anonymized for privacy.\n\n")
 
                 f.write("## Dashboard\n")
@@ -1402,7 +1403,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 
                 f.write("<div class='container'>")
                 
-                if mask or self.fm.get_ai_setting('analysis', 'mask_names'):
+                if effective_mask:
                     f.write("<div style='text-align: center; margin-bottom: 2rem; color: white; font-weight: bold;'>PRIVACY NOTICE: Names have been anonymized for privacy.</div>")
 
                 # Dashboard
