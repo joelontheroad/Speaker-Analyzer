@@ -53,20 +53,13 @@ class Extractor:
     def get_meeting_metadata(self, url):
         selected_connector = None
         for connector in self.connectors:
-            # Need to handle both staticmethod and instance method for can_handle, just in case
-            can_handle_func = getattr(connector, 'can_handle')
-            # If it's a bound method, it takes url. If not, maybe it needs self? In current architecture, it seems to be staticmethod.
-            # Currently can_handle is called on the instance in the original code
             try:
-                if can_handle_func(url):
+                if connector.can_handle(url):
                     selected_connector = connector
                     break
             except Exception as e:
                 self.log.warning(f"Error checking can_handle for {connector.__class__.__name__}: {e}")
         
-        default_offset = self.fm.get_ai_setting('analysis', 'default_start_offset') or 0
-        fallback_meta = {"title": "Unknown", "date": "Unknown", "offset": default_offset, "media_url": url}
-
         # Default to Youtube (Generic) if no specific match found
         if not selected_connector:
             fallback = next((c for c in self.connectors if 'youtube' in c.__class__.__name__.lower()), None)
@@ -76,38 +69,41 @@ class Extractor:
                 selected_connector = self.connectors[-1]
             else:
                  self.log.error("No connectors available.")
-                 return fallback_meta
+                 return None
             
         try:
             meta = selected_connector.get_metadata(url)
         except Exception as e:
             self.log.error(f"Metadata extraction crashed in {selected_connector.__class__.__name__}: {e}")
-            return fallback_meta
+            return None
             
         # Validation
         if not meta or not isinstance(meta, dict):
-             self.log.warning(f"Connector {selected_connector.__class__.__name__} returned invalid or no metadata. Using fallback.")
-             return fallback_meta
+             self.log.error(f"Connector {selected_connector.__class__.__name__} returned invalid or no metadata.")
+             return None
              
         # Check required fields
-        required_keys = ['title', 'date', 'offset', 'media_url']
-        missing_keys = [k for k in required_keys if k not in meta]
+        required_keys = ['title', 'date', 'media_url']
+        missing_keys = [k for k in required_keys if k not in meta or not meta[k] or str(meta[k]).lower() in ['unknown', 'unknown date']]
         if missing_keys:
-             self.log.warning(f"Connector {selected_connector.__class__.__name__} metadata missing required keys: {missing_keys}")
-             for k in missing_keys:
-                 meta[k] = fallback_meta[k]
+             self.log.error(f"CRITICAL ERROR: Connector {selected_connector.__class__.__name__} missing required metadata: {missing_keys}")
+             self.log.error("This meeting cannot be processed without a valid title and date.")
+             return None
 
-        # Type checking
+        # Type checking and normalization
         try:
-             meta['offset'] = int(meta['offset'])
+             # Ensure offset is an int
+             if 'offset' in meta:
+                 meta['offset'] = int(meta['offset'])
+             else:
+                 meta['offset'] = self.fm.get_ai_setting('analysis', 'default_start_offset') or 0
         except (ValueError, TypeError):
-             self.log.warning(f"Connector {selected_connector.__class__.__name__} returned invalid type for 'offset': {meta['offset']}. Expected int.")
-             meta['offset'] = default_offset
+             meta['offset'] = 0
              
-        if not isinstance(meta['title'], str): meta['title'] = str(meta['title'])
-        if not isinstance(meta['date'], str): meta['date'] = str(meta['date'])
-        if meta['media_url'] is not None and not isinstance(meta['media_url'], str): 
-            meta['media_url'] = str(meta['media_url'])
+        # String normalization
+        meta['title'] = str(meta['title']).strip()
+        meta['date'] = str(meta['date']).strip()
+        meta['media_url'] = str(meta['media_url']).strip()
 
         return meta
 

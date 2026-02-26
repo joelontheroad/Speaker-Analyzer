@@ -77,7 +77,7 @@ class AustinHRCConnector:
         # Some links use austintexas.box.com, others use austintexas.app.box.com
         shared_name_match = re.search(r'/s/([a-zA-Z0-9]+)', box_url)
         if not shared_name_match:
-            return "Unknown Date"
+            return None
             
         shared_name = shared_name_match.group(1)
         
@@ -110,4 +110,4 @@ class AustinHRCConnector:
                 # Page might not exist, that's fine
                 self.log.debug(f"Error checking {url} for date: {e}")
                 
-        return "Unknown Date"
+        return None

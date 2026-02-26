@@ -215,7 +215,7 @@ If you cannot identify the person, return 'NONE'."""
         with open(transcript_path, 'r') as f:
             data = json.load(f)
 
-        # Load Metadata
+        # 1. Load meeting metadata from JSON sidecar
         meta_path = os.path.join(self.fm.resolve_path('summaries'), f"{video_id}_metadata.json")
         metadata = {}
         if os.path.exists(meta_path):
@@ -224,6 +224,11 @@ If you cannot identify the person, return 'NONE'."""
         
         # Extract date - try from metadata first, then parse from title
         meeting_date = metadata.get('date', 'Unknown Date')
+        if meeting_date.lower() in ['unknown', 'unknown date']:
+            self.log.warning(f"SKIPPING {video_id}: Meeting has invalid/unknown date metadata. Please delete results for this meeting and re-run.")
+            return [], 0, None, video_id
+            
+        meeting_title = metadata.get('title', video_id)
         if meeting_date == 'Unknown Date':
             title = metadata.get('title', '')
             # Try to extract date from title like "Mar 21, 2024 City Council Meetings"
@@ -769,9 +774,9 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                     except:
                         continue
                 self.log.warning(f"Failed to parse date: {date_str} (cleaned: {clean_date})")
-                return datetime.min  # Fallback for unparseable dates
+                return datetime.max  # Fallback for unparseable dates
             except:
-                return datetime.min
+                return datetime.max
         
         all_results.sort(key=lambda r: parse_date(r['date']))
         
@@ -806,9 +811,9 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
         topic = self._get_topic()
         
         if all_meeting_dates:
-            dates = [d for d in all_meeting_dates if d != 'Unknown Date']
+            dates = [d for d in all_meeting_dates if d and d.lower() != 'unknown date' and d.lower() != 'unknown']
         else:
-            dates = [r['date'] for r in filtered_results if r['date'] != 'Unknown Date']
+            dates = [r['date'] for r in filtered_results if r['date'] and r['date'].lower() != 'unknown date' and r['date'].lower() != 'unknown']
             
         dates_sorted = sorted(dates, key=parse_date)
         
@@ -818,9 +823,12 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
         if dates_sorted:
              d_start = parse_date(dates_sorted[0])
              d_end = parse_date(dates_sorted[-1])
-             start_date_str = d_start.strftime('%Y-%m-%d') if d_start != datetime.min else "Unknown"
-             end_date_str = d_end.strftime('%Y-%m-%d') if d_end != datetime.min else "Unknown"
-             date_range = f"From {dates_sorted[0]} to {dates_sorted[-1]}"
+             start_date_str = d_start.strftime('%Y-%m-%d') if d_start != datetime.max else "Unknown"
+             end_date_str = d_end.strftime('%Y-%m-%d') if d_end != datetime.max else "Unknown"
+             if len(dates_sorted) == 1:
+                 date_range = f"{dates_sorted[0]}"
+             else:
+                 date_range = f"From {dates_sorted[0]} to {dates_sorted[-1]}"
         else:
              date_range = "Unknown"
 

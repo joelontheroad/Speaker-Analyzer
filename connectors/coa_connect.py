@@ -31,8 +31,21 @@ class COAConnector:
                 
             soup = BeautifulSoup(response.text, 'html.parser')
             title = soup.find('title').text.split('|')[0].strip()
+            
+            date_str = None
             date_element = soup.find(class_='video-date')
-            date_str = date_element.text.strip() if date_element else "Unknown Date"
+            if date_element:
+                date_str = date_element.text.strip()
+            
+            # Fallback: Try to find a date in the title if the video-date tag is missing
+            if not date_str or date_str.lower() == 'unknown date':
+                # Looking for patterns like "Oct 19, 2023" or "October 19, 2023"
+                date_match = re.search(r'([A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4})', title)
+                if date_match:
+                    date_str = date_match.group(1)
+                    self.log.info(f"Date found in title fallback: {date_str}")
+                else:
+                    date_str = None # Fail hard
             
             offset = self.get_chapter_data(soup)
             if offset == 0:

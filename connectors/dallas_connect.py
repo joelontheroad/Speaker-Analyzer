@@ -46,8 +46,19 @@ class DallasConnector:
             title_tag = soup.find('title')
             base_title = title_tag.text.split('|')[0].strip() if title_tag else "Dallas City Council Meeting"
             
+            date_str = None
             date_element = soup.find(class_='video-date')
-            date_str = date_element.text.strip() if date_element else "Unknown Date"
+            if date_element:
+                date_str = date_element.text.strip()
+            
+            # Fallback: Try to find a date in the title if the video-date tag is missing
+            if not date_str or date_str.lower() == 'unknown date':
+                date_match = re.search(r'([A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4})', base_title)
+                if date_match:
+                    date_str = date_match.group(1)
+                    self.log.info(f"Date found in title fallback: {date_str}")
+                else:
+                    date_str = None
             
             media_url = self.extract_media_url(soup)
             
