@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env ./.venv/bin/python3
 # **********************************************************
 # Public Meeting Speaker Analyzer
 # file: check-urls.py
@@ -106,7 +106,9 @@ def main():
                     sys.stdout.flush()
                     
                     meta = ext.get_meeting_metadata(url)
-                    if meta.get('title') == "Unknown" or meta.get('media_url') is None:
+                    if not meta:
+                        error_reason = "Unsupported (No suitable connector found or extraction failed)"
+                    elif meta.get('title') == "Unknown" or meta.get('media_url') is None:
                         error_reason = "Unsupported (No suitable connector found)"
                     elif "doesn't exist" in meta.get('title', '').lower():
                         error_reason = "Inaccessible (Swagit 404)"

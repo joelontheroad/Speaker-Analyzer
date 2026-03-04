@@ -115,6 +115,10 @@ class Extractor:
         # Get metadata using the source URL
         meta = self.get_meeting_metadata(url)
         
+        if not meta:
+            self.log.error(f"Critical: Could not acquire metadata for {vid_id}. Skipping acquisition.")
+            return None, None
+
         # Override media_url in manifest if found in meta
         download_url = meta.get('media_url', url)
         

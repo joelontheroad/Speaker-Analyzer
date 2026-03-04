@@ -25,7 +25,12 @@ class YoutubeConnector:
     def get_metadata(self, url):
         self.log.info(f"Fetching YouTube metadata for {url}...")
         try:
-            ydl_opts = {'quiet': True, 'skip_download': True}
+            ydl_opts = {
+                'quiet': True, 
+                'skip_download': True,
+                'js_runtimes': {'node': {}},
+                'remote_components': ['ejs:github']
+            }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 

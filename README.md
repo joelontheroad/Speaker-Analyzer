@@ -220,7 +220,7 @@ A validation utility used to "dry-run" your input URLs before starting a long tr
 ### The Program's Approach to Privacy and Security ###
 This program was designed as a "Private AI". It assumes media files are downloaded from the public internet to a private network behind an industry standard firewall and that all analysis are done on GPU's located in the network behind that firewall. The intent is that all files stay within this private network. The connects to the Internet for two specific tasks: 1) downloading video files and 2) getting authorization from Hugging Face to use a transcription service on the local drive; this happens each time the program is run. In this way, all analysis and reporting is private.  The program doesn not enforce this requirement, so it's assumed that the user will use it that way. By using an encrypted hard drive for the media files, you may actually be able to pass some security certifications, but there are no guarantees. If this an issue, consult a compliance professional. Future versions may eliminate the need for getting validation every time from Hugging Face.  If you already have have a media database, you can point to it via defaults.yaml and not have to go out to the Internet.
 
-**This Program Was Created wit Agentic AI**
+### This Program Was Created wit Agentic AI ###
 This program was created with Google Antigravity and agentic AI programming tool. It started as a human readable specification from which much of this README.md file came. The program was released on github nine days later. The iterative programming process consisted of running the program, seeing bugs, or a thinking up new functionality, and then communicating that to Antigravity.  
 
 Sometimes the prompts for new functionality were simple, such as:
@@ -290,3 +290,51 @@ Access Restrictions: To download the model, users are strictly required to creat
 AGPLv3 Friction: AGPLv3 (Section 10) explicitly states: "You may not impose any further restrictions on the exercise of the rights granted or affirmed under this License." By tying a core functionality of speaker-analyzer to a component that restricts anonymous, automated downloading, the application introduces friction.
 
 --- End Antigravity Output ---
+
+
+
+research_results.md
+../../brain/64281293-2292-4195-aa66-6afaa5dd4a06
+
+
+# Desktop and Laptop Computers with GPUs (2024-2025)
+The following is a sample list of current models from top manufacturers that include a GPU, with direct links to purchase them. Models highlighted with **(High Performance)** meet or exceed the performance of an **NVIDIA RTX A2000 (12GB)**, which serves as our baseline (~8.0 TFLOPS FP32).  This list is provided as a courtesty. It'll most certainly be out of date by the time you read this as the rate of change in computer hardware is so high. Also, none of these systems have been tested against this software, but the gauging buy the GPU performance numbers, they should run this program just fine.
+
+---
+## Desktop Computers
+| Manufacturer | Model Series | GPU Options | Purchase Link | Performance Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dell** | [Precision 3680 Tower](https://www.dell.com/en-us/shop/workstations/precision-3680-tower-workstation/spd/precision-3680-workstation) | NVIDIA RTX 2000-6000 Ada | [View on Dell](https://www.dell.com/en-us/shop/workstations/precision-3680-tower-workstation/spd/precision-3680-workstation) | **(High Performance)** |
+| | [XPS Desktop](https://www.dell.com/en-us/shop/desktop-computers/xps-desktop/spd/xps-8960-desktop) | NVIDIA RTX 4060 - 4080 | [View on Dell](https://www.dell.com/en-us/shop/desktop-computers/xps-desktop/spd/xps-8960-desktop) | **(High Performance)** |
+| | [Alienware Aurora R16](https://www.dell.com/en-us/shop/desktop-computers/alienware-aurora-r16-gaming-desktop/spd/alienware-aurora-r16-desktop) | NVIDIA RTX 4070 - 4090 | [View on Dell](https://www.dell.com/en-us/shop/desktop-computers/alienware-aurora-r16-gaming-desktop/spd/alienware-aurora-r16-desktop) | **(High Performance)** |
+| **HP** | [Z2 G9 Tower](https://www.hp.com/us-en/shop/pdp/hp-z2-tower-g9-workstation-desktop-pc-customizable-5f0h0av-1) | NVIDIA RTX A2000 - A5000 | [View on HP](https://www.hp.com/us-en/shop/pdp/hp-z2-tower-g9-workstation-desktop-pc-customizable-5f0h0av-1) | **(High Performance)** |
+| | [Omen 45L Gaming](https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-1455xt-bundle-7p3e2aa-aba-1) | NVIDIA RTX 4070 Ti - 4090 | [View on HP](https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-1455xt-bundle-7p3e2aa-aba-1) | **(High Performance)** |
+| **Lenovo** | [ThinkStation P3](https://www.lenovo.com/us/en/p/workstations/thinkstation-p-series/thinkstation-p3-tower/len102s0015) | NVIDIA RTX 2000 - 5000 Ada | [View on Lenovo](https://www.lenovo.com/us/en/p/workstations/thinkstation-p-series/thinkstation-p3-tower/len102s0015) | **(High Performance)** |
+| | [Legion Tower 7i](https://www.lenovo.com/us/en/p/desktops/legion-desktops/legion-t-series-towers/legion-tower-7i-gen-8-(intel)/len102g0002) | NVIDIA RTX 4080 - 4090 | [View on Lenovo](https://www.lenovo.com/us/en/p/desktops/legion-desktops/legion-t-series-towers/legion-tower-7i-gen-8-(intel)/len102g0002) | **(High Performance)** |
+| **Apple** | [Mac Studio](https://www.apple.com/mac-studio/) | M2 Max / M2 Ultra | [View on Apple](https://www.apple.com/mac-studio/) | **(High Performance)** |
+| | [Mac Pro](https://www.apple.com/mac-pro/) | M2 Ultra | [View on Apple](https://www.apple.com/mac-pro/) | **(High Performance)** |
+| **ASUS** | [ROG Strix G16CH](https://rog.asus.com/desktops/mid-tower/rog-strix-g16ch-series/) | NVIDIA RTX 4070 - 4080 | [View on ASUS](https://rog.asus.com/desktops/mid-tower/rog-strix-g16ch-series/) | **(High Performance)** |
+| **MSI** | [Infinite RS AI](https://www.msi.com/Desktop/Infinite-RS-14th) | NVIDIA RTX 4070 - 4090 | [View on MSI](https://www.msi.com/Desktop/Infinite-RS-14th) | **(High Performance)** |
+| **Acer** | [Predator Orion 7000](https://www.acer.com/us-en/predator/desktops/orion/orion-7000) | NVIDIA RTX 4080 - 4090 | [View on Acer](https://www.acer.com/us-en/predator/desktops/orion/orion-7000) | **(High Performance)** |
+---
+## Laptop Computers
+| Manufacturer | Model Series | GPU Options | Purchase Link | Performance Note |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dell** | [Precision 5690](https://www.dell.com/en-us/shop/workstations/precision-5690-mobile-workstation/spd/precision-5690-laptop) | NVIDIA RTX 2000-5000 Ada | [View on Dell](https://www.dell.com/en-us/shop/workstations/precision-5690-mobile-workstation/spd/precision-5690-laptop) | **(High Performance)** |
+| | [XPS 16](https://www.dell.com/en-us/shop/dell-laptops/xps-16-laptop/spd/xps-16-9640-laptop) | NVIDIA RTX 4050 - 4070 | [View on Dell](https://www.dell.com/en-us/shop/dell-laptops/xps-16-laptop/spd/xps-16-9640-laptop) | **(High Performance)** |
+| **HP** | [ZBook Fury G11](https://www.hp.com/us-en/shop/pdp/hp-zbook-fury-16-g11-mobile-workstation-pc-customizable-946u0av-1) | NVIDIA RTX 3500-5000 Ada | [View on HP](https://www.hp.com/us-en/shop/pdp/hp-zbook-fury-16-g11-mobile-workstation-pc-customizable-946u0av-1) | **(High Performance)** |
+| | [Omen Transcend 16](https://www.hp.com/us-en/shop/pdp/omen-transcend-laptop-16t-u100-161-8t4j2av-1) | NVIDIA RTX 4070 | [View on HP](https://www.hp.com/us-en/shop/pdp/omen-transcend-laptop-16t-u100-161-8t4j2av-1) | **(High Performance)** |
+| **Lenovo** | [ThinkPad P1 Gen 7](https://www.lenovo.com/us/en/p/laptops/thinkpad/thinkpadp/thinkpad-p1-gen-7-(16-inch-intel)/len101t0105) | NVIDIA RTX 1000-3000 Ada | [View on Lenovo](https://www.lenovo.com/us/en/p/laptops/thinkpad/thinkpadp/thinkpad-p1-gen-7-(16-inch-intel)/len101t0105) | **(High Performance)** |
+| | [Legion Pro 7i](https://www.lenovo.com/us/en/p/laptops/legion-laptops/legion-pro-series/legion-pro-7i-gen-8-(16-inch-intel)/len101g0023) | NVIDIA RTX 4080 - 4090 | [View on Lenovo](https://www.lenovo.com/us/en/p/laptops/legion-laptops/legion-pro-series/legion-pro-7i-gen-8-(16-inch-intel)/len101g0023) | **(High Performance)** |
+| **Apple** | [MacBook Pro (M4)](https://www.apple.com/shop/buy-mac/macbook-pro) | M4 Pro / M4 Max | [View on Apple](https://www.apple.com/shop/buy-mac/macbook-pro) | **(High Performance)** |
+| **ASUS** | [ROG Zephyrus G16](https://rog.asus.com/laptops/rog-zephyrus/rog-zephyrus-g16-2024/) | NVIDIA RTX 4070 - 4090 | [View on ASUS](https://rog.asus.com/laptops/rog-zephyrus/rog-zephyrus-g16-2024/) | **(High Performance)** |
+| **MSI** | [Titan 18 HX AI](https://www.msi.com/Laptop/Titan-18-HX-A14VX) | NVIDIA RTX 4080 - 4090 | [View on MSI](https://www.msi.com/Laptop/Titan-18-HX-A14VX) | **(High Performance)** |
+| **Acer** | [Predator Helios 18](https://www.acer.com/us-en/predator/laptops/helios/helios-18) | NVIDIA RTX 4080 - 4090 | [View on Acer](https://www.acer.com/us-en/predator/laptops/helios/helios-18) | **(High Performance)** |
+---
+### Performance Baseline Note: NVIDIA RTX A2000 (12GB)
+The **RTX A2000 12GB** is a professional workstation card based on the Ampere architecture (~8.0 TFLOPS FP32).
+**Comparison Thresholds for High Performance:**
+- **NVIDIA Desktop:** RTX 3060, RTX 4060, and higher models.
+- **NVIDIA Laptop:** RTX 4050 Laptop and higher (due to generational efficiency).
+- **Apple Silicon:** M3 Max and all M4 Pro/Max variants.
+- **Professional:** RTX 2000 Ada and higher models.

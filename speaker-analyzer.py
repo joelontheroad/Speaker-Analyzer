@@ -240,6 +240,7 @@ def main():
     stats = {
         'downloaded': 0,
         'existing_media': 0,
+        'failed_acquisition': 0,
         'transcribed': 0,
         'existing_transcripts': 0,
         'reported': 0
@@ -279,15 +280,23 @@ def main():
             media_path = os.path.join(fm.resolve_path('media'), f"{vid_id}_audio.mp3")
             file_existed = os.path.exists(media_path)
             
-            path, meta = ext.run_acquisition(manifest, force=args.force)
-            if path:
-                # Track statistics
-                if file_existed and not args.force:
-                    stats['existing_media'] += 1
+            try:
+                path, meta = ext.run_acquisition(manifest, force=args.force)
+                if path:
+                    # Track statistics
+                    if file_existed and not args.force:
+                        stats['existing_media'] += 1
+                    else:
+                        stats['downloaded'] += 1
+                    media_map[vid_id] = path
+                    print(f"--- Acquired: {meta.get('title', 'Unknown')} ---")
                 else:
-                    stats['downloaded'] += 1
-                media_map[vid_id] = path
-                print(f"--- Acquired: {meta.get('title', 'Unknown')} ---")
+                    stats['failed_acquisition'] += 1
+                    print(f"--- Failed to acquire: {url} ---")
+            except Exception as e:
+                stats['failed_acquisition'] += 1
+                log.error(f"Unexpected error processing {url}: {e}")
+                print(f"--- Error: {url} (See logs) ---")
 
     # PHASE 2: TRANSCRIBE
     transcript_map = {}
@@ -323,14 +332,20 @@ def main():
             trans_path = os.path.join(fm.resolve_path('transcripts'), f"{vid_id}_transcript.json")
             file_existed = os.path.exists(trans_path)
             
-            trans_file = ext.run_transcription(vid_id, force=args.force, translate_to_english=args.english)
-            if trans_file:
-                # Track statistics
-                if file_existed and not args.force:
-                    stats['existing_transcripts'] += 1
+            try:
+                trans_file = ext.run_transcription(vid_id, force=args.force, translate_to_english=args.english)
+                if trans_file:
+                    # Track statistics
+                    if file_existed and not args.force:
+                        stats['existing_transcripts'] += 1
+                    else:
+                        stats['transcribed'] += 1
+                    transcript_map[vid_id] = trans_file
                 else:
-                    stats['transcribed'] += 1
-                transcript_map[vid_id] = trans_file
+                    print(f"--- Failed to transcribe: {vid_id} ---")
+            except Exception as e:
+                log.error(f"Unexpected error transcribing {vid_id}: {e}")
+                print(f"--- Error transcribing: {vid_id} (See logs) ---")
 
     # PHASE 3: REPORT
     if run_report:
