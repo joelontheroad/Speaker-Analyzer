@@ -1,4 +1,6 @@
-## Overview
+# Open Meeting Speaker Analyzer
+
+## Overview of Speaker Analyzer
 Welcome to the Public Meeting Speaker Analyzer utility. A configurable, private, AI-powered tool for transcribing the video of public meetings; summarizing what people said; and reporting on sentiment. It's private in that it's designed to run on a local machine with a GPU, whether that's your desktop, a laptop, or a server on your local network. Journalists, researchers, and others in civil society will find this tool useful. 
 
 You tell the program what to analyze using a natural language prompt and then help the AI refine it's analysis by also providing keywords. You can also define sentiment categories to the AI determine sentiment of each speaker on the topic in which you're interested. 
@@ -7,7 +9,7 @@ Setup is potentially easy as it consists of running a single command, `./setup.s
 
 To maintain privacy,you can mask the names of speakers so that you can distribute your findings, retaining their privacy. This program is not GDPR, NIST 800-122, nor ISO27001 compliant, although the author believes it can be made compliant with effort. Be sure to check local laws before using and before distributing reports.
 
-## Features
+## Features of Open Meeting Speaker Analyzer
 -   **Links to Video**: All reports include links to the exact place where someone said something cited in a report so you can quickly jump to it and hear exactly what a person said. 
 -   **Modular Architecture**: Includes connectors for City of Austin, City of Houston, and YouTube. Other connectors to different video sources can be created by anyone so you can perform analysis on any public meeting database that doesn't restrict downloads.
 -   **Privacy Feature**: Optional masking of speaker names (--mask cli flag) so that you can share reports while maintaining the privacy of the speakers. 
@@ -15,7 +17,7 @@ To maintain privacy,you can mask the names of speakers so that you can distribut
 -   **Flexible CLI**: Run phases (Download, Transcribe, Report) individually or all at once. Download the media once, report again and again even with different prompts to extract the most knowledge you can.
 -   **Ad-hoc Questions**: In addition to the standard reports, you can ask any question you like of the knowledge base you've downloaded it, regardless of what was prompted in the reports.  Allows you to ask questions once you gain insights from the reports.  
 
-## How It Works
+## How Open Meeting Speaker Analyzer  Works
 
 The main program, speaker-analyzer.py, runs in three phases:
 Phase 1: download media
@@ -38,9 +40,9 @@ The program has been developed on the following hardware/software configuration.
     -   FFmpeg
 -   **Hugging Face**: A Hugging Face token (`HF_TOKEN`) is required for `pyannote` speaker diarization.
 
-## Getting Started
+## Getting Started with Open Meeting Speaker Analyzer
 
-### 1. Prerequisites & Model Access
+### 1. Prerequisites & Model Access for Speaker Analyzer
 WhisperX uses **Pyannote** for speaker diarization (identifying who is speaking). These models are "gated" on Hugging Face, meaning you must manually accept their terms of use before the program can download them.
 
 1.  **Create an Account**: Sign up at [huggingface.co](https://huggingface.co/join).
