@@ -385,13 +385,20 @@ If you cannot identify the person, return 'NONE'."""
             # Add offset - audio timestamps are relative to extraction start, not video start
             video_timestamp = start_time + offset
             
-            # Use proper Swagit format: remove trailing /0 and use ?ts= query param
-            base_url = source_url.split('?')[0].split('#')[0].rstrip('/')
-            if base_url.endswith('/0'):
-                base_url = base_url[:-2]  # Remove /0
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(source_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}".rstrip('/')
             
-            # Format timestamp depending on source
-            if 'box.com' in base_url:
+            # Remove trailing /0 for Swagit
+            if base_url.endswith('/0'):
+                base_url = base_url[:-2]
+            
+            if 'youtube.com' in parsed_url.netloc or 'youtu.be' in parsed_url.netloc:
+                qs = urllib.parse.parse_qs(parsed_url.query)
+                qs['t'] = [f"{video_timestamp}s"]
+                new_query = urllib.parse.urlencode(qs, doseq=True)
+                video_link = f"{base_url}?{new_query}"
+            elif 'box.com' in parsed_url.netloc:
                 video_link = f"{base_url}?t={video_timestamp}s"
             else:
                 video_link = f"{base_url}?ts={video_timestamp}"
@@ -790,7 +797,7 @@ If an organization doesn't fit well, use the closest fit or 'Unaffiliated / Priv
                 clean_date = date_str.replace('Sept ', 'Sep ').replace('Sept. ', 'Sep. ')
                 
                 # Try parsing common formats
-                for fmt in ['%b %d, %Y', '%B %d, %Y', '%Y-%m-%d', '%b. %d, %Y', '%m/%d/%Y', '%m/%d/%y']: # Added new formats
+                for fmt in ['%b %d, %Y', '%B %d, %Y', '%Y-%m-%d', '%b. %d, %Y', '%m/%d/%Y', '%m/%d/%y', '%Y%m%d']: # Added new formats
                     try:
                         return datetime.strptime(clean_date, fmt)
                     except:

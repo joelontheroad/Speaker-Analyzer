@@ -69,8 +69,12 @@ class KnowledgeQuery:
 
     def _get_embedding(self, text):
         url = f"{self.api_url.rstrip('/')}/v1/embeddings"
+        
+        # Add Nomic embedding prefix for querying
+        prefixed_text = f"search_query: {text}"
+        
         payload = {
-            "input": text,
+            "input": prefixed_text,
             "model": self.emb_model
         }
         try:
@@ -85,7 +89,52 @@ class KnowledgeQuery:
             self.log.error(f"Embedding Exception: {e}")
             return None
 
+    def _extract_exact_keyword(self, query_text):
+        """Use the LLM to pull out exact keyword constraints from the user query."""
+        system_prompt = """You are an intent extraction API. 
+Analyze the user's query. If the user is asking to find an exact word, phrase, or quote, extract ONLY that exact string.
+Examples:
+- "did a speaker use the word 'pretend'?" -> pretend
+- "list all speakers that used the word 'pretend'" -> pretend
+- "who said 'I hate you'?" -> I hate you
+- "why are people angry?" -> NONE
+
+Rules:
+1. Return ONLY the exact keyword or phrase to match.
+2. Strip all surrounding punctuation or quotes from the keyword.
+3. If no exact keyword constraint is found, return the word NONE."""
+
+        payload = {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query_text}
+            ],
+            "temperature": 0.0,
+            "max_tokens": 50
+        }
+        
+        try:
+            url = f"{self.api_url.rstrip('/')}/v1/chat/completions"
+            resp = requests.post(url, json=payload, timeout=30)
+            if resp.status_code == 200:
+                keyword = resp.json()['choices'][0]['message']['content'].strip()
+                # Remove common quotes just in case the LLM leaves them
+                keyword = keyword.strip("'\"")
+                
+                print(f"[DEBUG] Extracted keyword: '{keyword}'")
+                
+                if keyword and keyword.upper() != "NONE":
+                    return keyword
+                return None
+            return None
+        except Exception as e:
+            self.log.debug(f"Keyword extraction failed (non-fatal): {e}")
+            return None
+
     def search(self, query_text, sentiment_filter=None):
+        self._spinner_update("Analyzing query intent...")
+        exact_keyword = self._extract_exact_keyword(query_text)
+        
         self._spinner_update("Embedding your question...")
         query_emb = self._get_embedding(query_text)
         if not query_emb:
@@ -101,6 +150,10 @@ class KnowledgeQuery:
         
         if sentiment_filter:
             query_args["where"] = {"sentiment": sentiment_filter}
+            
+        if exact_keyword:
+            self.log.info(f"Applying exact keyword filter: '{exact_keyword}'")
+            query_args["where_document"] = {"$contains": exact_keyword}
             
         results = self.collection.query(**query_args)
         self._spinner_done()
@@ -280,7 +333,9 @@ Context:
         if not used_sources:
             print("- No direct sources cited in the response.")
         for src_tag, det in used_sources.items():
-            print(f"- {det['name']} in {det['title']} ({det['date']}) @ {det['time']} [{det['url']}]")
+            # Add an explicit, clickable terminal link if possible
+            terminal_link = det['url']
+            print(f"- {det['name']} in {det['title']} ({det['date']}) @ {det['time']} [\033[94m\033[4m{terminal_link}\033[0m]")
         print("\n" + "="*60 + "\n")
 
     def _export_markdown(self, query, md_answer, source_map, is_separate, batch_timestamp, mask=False):

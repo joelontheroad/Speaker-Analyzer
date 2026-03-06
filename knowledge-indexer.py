@@ -64,8 +64,12 @@ class KnowledgeIndexer:
 
     def _get_embedding(self, text):
         url = f"{self.api_url.rstrip('/')}/v1/embeddings"
+        
+        # Add Nomic embedding prefix for indexing
+        prefixed_text = f"search_document: {text}"
+        
         payload = {
-            "input": text,
+            "input": prefixed_text,
             "model": self.emb_model
         }
         try:
@@ -97,23 +101,27 @@ class KnowledgeIndexer:
             nonlocal chunk_index, current_text, current_word_count
             if not current_text: return
             
-            text_str = " ".join(current_text)
+            raw_text_str = " ".join(current_text)
             if current_word_count > 2: # Lowered from 10 to catch short interjections like "Out of order"
                 meta = metadata_template.copy()
                 
                 # Resolve name and sentiment from manifest
                 speaker_info = speaker_sentiments.get(current_speaker, {})
-                meta['speaker'] = speaker_info.get('name', current_speaker or 'Unknown')
+                speaker_name = speaker_info.get('name', current_speaker or 'Unknown')
+                
+                meta['speaker'] = speaker_name
                 meta['sentiment'] = speaker_info.get('sentiment', 'Unknown')
                 
                 meta['timestamp'] = current_start_time + meta.get('offset', 0)
                 
                 if 'offset' in meta:
                     del meta['offset']
+                    
+                contextual_text = f"Speaker {speaker_name} said: {raw_text_str}"
                 
                 chunks.append({
                     'id': f"{meta['video_id']}_{chunk_index}",
-                    'text': text_str,
+                    'text': contextual_text,
                     'metadata': meta
                 })
                 chunk_index += 1
