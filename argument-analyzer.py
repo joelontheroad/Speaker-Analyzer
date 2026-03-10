@@ -563,7 +563,8 @@ DO NOT return markdown. Only return valid JSON."""
             f.write(f"<div class='header'>")
             f.write(f"<div class='meta'>SEMANTIC ARGUMENT CLUSTERING // GENESIS ANALYSIS</div>")
             f.write(f"<h1>{source_name}: Argument Landscape</h1>")
-            f.write(f"<p style='opacity: 0.7; margin-top: 0.5rem;'>{date_range}</p>")
+            f.write(f"<p style='opacity: 0.7; margin-top: 0.5rem; margin-bottom: 0;'>{date_range}</p>")
+            f.write(f"<p style='opacity: 0.6; margin-top: 0.2rem; font-size: 0.9rem; font-family: monospace;'>Report Generated: {datetime.datetime.now().strftime('%B %d, %Y')}</p>")
             f.write(f"</div>")
             
             f.write("<div class='container'>")
@@ -586,7 +587,6 @@ DO NOT return markdown. Only return valid JSON."""
                     count = speaker_stats.get(cat, 0)
                     pct = speaker_stats.get(f"pct_{cat}", 0)
                     f.write(f"<div class='stat-card'><div class='label'>{cat}</div><div class='value'>{count}<br><span style='font-size: 0.9rem; color: var(--text-muted); font-weight: 500;'>{pct:.1f}%</span></div></div>")
-            f.write(f"<div class='stat-card'><div class='label'>Report Date</div><div class='value' style='font-size: 1.2rem; padding-top: 0.8rem;'>{datetime.datetime.now().strftime('%b %d, %Y')}</div></div>")
             f.write("</div>")
             
             f.write("<div class='content-section'>")
